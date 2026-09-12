@@ -10,9 +10,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"rss-reader/globals"
 	"rss-reader/internal/archive"
 	appstate "rss-reader/internal/state"
+	"rss-reader/internal/web"
 	"rss-reader/models"
 	"rss-reader/utils"
 )
@@ -44,7 +44,7 @@ func main() {
 		tplHandler(state, w, r)
 	})
 
-	fs := http.FileServer(http.FS(globals.DirStatic))
+	fs := http.FileServer(http.FS(web.Static))
 	mux.Handle("/static/", fs)
 
 	serve := fmt.Sprintf(":%d", config.Port)
@@ -58,7 +58,7 @@ func tplHandler(state *appstate.State, w http.ResponseWriter, r *http.Request) {
 			return i + 1
 		},
 	}
-	tmpl, err := tmplInstance.Funcs(funcMap).ParseFS(globals.DirStatic, "static/index.html")
+	tmpl, err := tmplInstance.Funcs(funcMap).ParseFS(web.Static, "static/index.html")
 	if err != nil {
 		log.Println("模板加载错误:", err)
 		http.Error(w, "template error", http.StatusInternalServerError)
