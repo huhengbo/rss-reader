@@ -1,0 +1,56 @@
+name: UI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ui-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    name: Browser (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.x'
+          cache: true
+      - name: Install locked test dependencies
+        run: npm ci --ignore-scripts
+      - name: Unit tests and asset budget
+        run: |
+          npm test
+          npm run check:assets
+      - name: Install browser
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Browser regression tests
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: artifacts/browser-results.json
+        run: npm run test:e2e -- --project=${{ matrix.browser }} --reporter=list,html,json
+      - name: Upload traces, reports and review screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader-ui-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+            artifacts/
+          retention-days: 7
+          if-no-files-found: ignore

@@ -2,10 +2,19 @@
 config.json
 archives.txt
 *.local.json
+.env
+.env.*
+!.env.example
 
-# Build output
+# Build and test output
 /bin/
 /dist/
+/rss-reader
+/rss-reader.exe
+/node_modules/
+/playwright-report/
+/test-results/
+/artifacts/
 
 # Editors and OS files
 .DS_Store
