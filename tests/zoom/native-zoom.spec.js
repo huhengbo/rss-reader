@@ -15,12 +15,29 @@ async function setZoom(worker, factor) {
 
 async function metrics(page) {
   return page.evaluate(() => ({
-    innerWidth, outerWidth, pixelRatio: devicePixelRatio,
+    innerWidth, innerHeight, outerWidth, pixelRatio: devicePixelRatio,
     scrollWidth: document.documentElement.scrollWidth,
     pinchScale: visualViewport.scale,
     cssZoom: getComputedStyle(document.documentElement).zoom,
     bodyFontSize: getComputedStyle(document.body).fontSize
   }));
+}
+
+async function captureViewport(page) {
+  const session = await page.context().newCDPSession(page);
+  try {
+    // An un-clipped browser surface capture avoids fullPage's CSS/DIP mismatch
+    // at native zoom. Do not resize the viewport or rescale the resulting image.
+    const { data } = await session.send('Page.captureScreenshot', {
+      format: 'png', fromSurface: true, captureBeyondViewport: false
+    });
+    const png = Buffer.from(data, 'base64');
+    const width = png.readUInt32BE(16), height = png.readUInt32BE(20);
+    const current = await metrics(page);
+    expect(Math.abs(width - current.innerWidth * current.pixelRatio)).toBeLessThanOrEqual(2);
+    expect(Math.abs(height - current.innerHeight * current.pixelRatio)).toBeLessThanOrEqual(2);
+    return { png, width, height };
+  } finally { await session.detach(); }
 }
 
 test('native 100–200% browser zoom preserves reading and controls across all skins', async ({ request }, testInfo) => {
@@ -33,7 +50,7 @@ test('native 100–200% browser zoom preserves reading and controls across all s
     viewport: null, locale: 'zh-CN', timezoneId: 'Asia/Shanghai', reducedMotion: 'reduce',
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, '--window-size=1280,900']
   });
-  const rows = [], errors = [], external = [];
+  const rows = [], captures = [], errors = [], external = [];
   let completed = false, userAgent = '';
   // Playwright Test owns tracing for this context through the shared config.
   try {
@@ -97,8 +114,10 @@ test('native 100–200% browser zoom preserves reading and controls across all s
         if (await more.getAttribute('aria-expanded') !== 'true') { await more.focus(); await page.keyboard.press('Enter'); }
         await expect(card.getByRole('link', { name: /技术周刊：第 12 篇/ })).toBeVisible();
         await expect(card.getByRole('list')).toBeVisible();
-        await page.evaluate(() => scrollTo(0, 0));
-        await testInfo.attach(`${skin}-${mode}-native-zoom-200`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+        await page.locator('.toolbar').scrollIntoViewIfNeeded();
+        const { png, width, height } = await captureViewport(page);
+        captures.push({ skin, mode, nativeFactor: 2, width, height, kind: 'unclipped viewport, unmodified PNG' });
+        await testInfo.attach(`${skin}-${mode}-native-zoom-200`, { body: png, contentType: 'image/png' });
       }
     }
     await request.post('/fixture/new');
@@ -108,11 +127,11 @@ test('native 100–200% browser zoom preserves reading and controls across all s
     await expect(page.locator('#refresh-view')).toBeFocused();
     expect(await page.evaluate(() => window.zoomDocumentMarker)).toBe('same reader document');
     await testInfo.attach('native-zoom-aria-snapshot', { body: Buffer.from(await page.locator('body').ariaSnapshot()), contentType: 'text/plain' });
-    expect(rows).toHaveLength(40);
+    expect(rows).toHaveLength(40); expect(captures).toHaveLength(8);
     expect(errors).toEqual([]); expect(external).toEqual([]);
     completed = true;
   } finally {
-    await testInfo.attach('native-zoom-metrics', { body: Buffer.from(JSON.stringify({ userAgent, mechanism: 'chrome.tabs.setZoom/getZoom; automatic, per-tab; no viewport emulation', completed, rows }, null, 2)), contentType: 'application/json' });
+    await testInfo.attach('native-zoom-metrics', { body: Buffer.from(JSON.stringify({ userAgent, mechanism: 'chrome.tabs.setZoom/getZoom; automatic, per-tab; no viewport emulation', completed, rows, captures }, null, 2)), contentType: 'application/json' });
     await context.close();
   }
 });
