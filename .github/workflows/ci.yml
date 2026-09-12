@@ -33,6 +33,11 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
       - name: Show Go version
         run: go version
 
@@ -54,6 +59,15 @@ jobs:
             echo "$files"
             exit 1
           fi
+
+      - name: Validate release notes generator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/generate_release_notes.py \
+            --version 1.0.0 \
+            --output /tmp/release-notes.md
+          grep -q "### 📦 升级说明" /tmp/release-notes.md
 
       - name: Vet
         run: go vet ./...

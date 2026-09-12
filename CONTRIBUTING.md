@@ -98,7 +98,17 @@ Dependabot 每周检查 Go modules 和 GitHub Actions。
 
 版本遵循 SemVer：`vMAJOR.MINOR.PATCH`。
 
-只有维护者推送 `v*` tag 才触发正式发布。Git tag、GitHub Release 和 GHCR 镜像版本必须互相可追溯。
+正式发布顺序：
+
+1. 在 `CHANGELOG.md` 新增与目标版本完全对应的 `## MAJOR.MINOR.PATCH` 章节。
+2. 写清用户可见变更，并**必须填写 `### 📦 升级说明`**：直接升级范围、配置/数据迁移、Docker Compose 操作、默认行为变化和必要的浏览器缓存说明。
+3. 合并并确认 CI / UI workflow 通过。
+4. 从该正式提交创建新的 `vMAJOR.MINOR.PATCH` tag；已发布 tag 不移动、不覆盖。
+5. Release workflow 先校验 CHANGELOG 并生成发布说明，再构建和推送 amd64/arm64 GHCR 镜像，最后创建 GitHub Release。
+
+如果 CHANGELOG 中不存在对应版本、升级说明缺失或升级说明为空，Release workflow 会失败，不发布缺少升级信息的正式版本。
+
+Git tag、GitHub Release、CHANGELOG 版本章节和 GHCR 镜像版本必须互相可追溯。
 
 ## Upstream
 
