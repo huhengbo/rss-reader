@@ -53,6 +53,14 @@ func TestNormalizeLink(t *testing.T) {
 	}
 }
 
+func TestSafeURLForLogRedactsCredentialsAndQuery(t *testing.T) {
+	got := safeURLForLog("https://user:pass@example.com/feed.xml?auth=secret#section")
+	want := "https://example.com/feed.xml"
+	if got != want {
+		t.Fatalf("safeURLForLog() = %q, want %q", got, want)
+	}
+}
+
 func TestCheckHandlesEmptyFeedState(t *testing.T) {
 	const feedURL = "https://example.com/feed.xml"
 	state := appstate.New(config.Config{Keywords: []string{"never-match-this-title"}})
