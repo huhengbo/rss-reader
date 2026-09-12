@@ -35,7 +35,7 @@ test('native 100–200% browser zoom preserves reading and controls across all s
   });
   const rows = [], errors = [], external = [];
   let completed = false, userAgent = '';
-  await context.tracing.start({ screenshots: true, snapshots: true });
+  // Playwright Test owns tracing for this context through the shared config.
   try {
     let [worker] = context.serviceWorkers();
     if (!worker) worker = await context.waitForEvent('serviceworker');
@@ -113,7 +113,6 @@ test('native 100–200% browser zoom preserves reading and controls across all s
     completed = true;
   } finally {
     await testInfo.attach('native-zoom-metrics', { body: Buffer.from(JSON.stringify({ userAgent, mechanism: 'chrome.tabs.setZoom/getZoom; automatic, per-tab; no viewport emulation', completed, rows }, null, 2)), contentType: 'application/json' });
-    await context.tracing.stop(completed ? {} : { path: testInfo.outputPath('native-zoom-trace.zip') });
     await context.close();
   }
 });
