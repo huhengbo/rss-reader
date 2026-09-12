@@ -7,7 +7,26 @@ import (
 	"testing"
 )
 
+func clearConfigEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"RSS_READER_CONFIG",
+		"RSS_READER_PORT",
+		"RSS_READER_ARCHIVES",
+		"RSS_READER_FEISHU_API",
+		"RSS_READER_DINGTALK_WEBHOOK",
+		"RSS_READER_DINGTALK_SIGN",
+		"RSS_READER_TELEGRAM_API",
+		"RSS_READER_TELEGRAM_CHAT_ID",
+		"RSS_READER_TELEGRAM_TOKEN",
+	} {
+		t.Setenv(key, "")
+	}
+}
+
 func TestLoadFile(t *testing.T) {
+	clearConfigEnv(t)
+
 	t.Run("parses valid config", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
 		content := `{
@@ -39,6 +58,61 @@ func TestLoadFile(t *testing.T) {
 		}
 		if !reflect.DeepEqual(conf.Values, []string{"https://example.com/feed.xml"}) {
 			t.Fatalf("values = %#v", conf.Values)
+		}
+	})
+
+	t.Run("applies safe defaults", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(path, []byte(`{"values":[]}`), 0o600); err != nil {
+			t.Fatalf("write config: %v", err)
+		}
+
+		conf, err := LoadFile(path)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+		if conf.Port != 8080 || conf.ReFresh != 5 || conf.ListHeight != 600 || conf.Archives != "archives.txt" {
+			t.Fatalf("defaults not applied: %#v", conf)
+		}
+		if conf.Notify.Telegram.API != defaultTelegramAPI {
+			t.Fatalf("telegram api = %q", conf.Notify.Telegram.API)
+		}
+	})
+
+	t.Run("environment overrides sensitive settings", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(path, []byte(`{"values":[]}`), 0o600); err != nil {
+			t.Fatalf("write config: %v", err)
+		}
+		t.Setenv("RSS_READER_PORT", "9090")
+		t.Setenv("RSS_READER_ARCHIVES", "runtime-archives.txt")
+		t.Setenv("RSS_READER_FEISHU_API", "https://example.test/feishu")
+		t.Setenv("RSS_READER_DINGTALK_WEBHOOK", "https://example.test/dingtalk")
+		t.Setenv("RSS_READER_DINGTALK_SIGN", "ding-secret")
+		t.Setenv("RSS_READER_TELEGRAM_CHAT_ID", "chat")
+		t.Setenv("RSS_READER_TELEGRAM_TOKEN", "token")
+
+		conf, err := LoadFile(path)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+		if conf.Port != 9090 || conf.Archives != "runtime-archives.txt" {
+			t.Fatalf("runtime overrides not applied: %#v", conf)
+		}
+		if conf.Notify.FeiShu.API == "" || conf.Notify.Dingtalk.Sign != "ding-secret" || conf.Notify.Telegram.Token != "token" {
+			t.Fatalf("secret overrides not applied: %#v", conf.Notify)
+		}
+	})
+
+	t.Run("rejects partial telegram credentials", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(path, []byte(`{"values":[]}`), 0o600); err != nil {
+			t.Fatalf("write config: %v", err)
+		}
+		t.Setenv("RSS_READER_TELEGRAM_TOKEN", "token-only")
+		t.Setenv("RSS_READER_TELEGRAM_CHAT_ID", "")
+		if _, err := LoadFile(path); err == nil {
+			t.Fatal("LoadFile() error = nil, want non-nil")
 		}
 	})
 

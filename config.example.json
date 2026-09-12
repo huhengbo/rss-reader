@@ -1,0 +1,29 @@
+{
+  "port": 8080,
+  "values": [
+    "https://example.com/feed.xml"
+  ],
+  "refresh": 5,
+  "autoUpdatePush": 0,
+  "listHeight": 600,
+  "webTitle": "RSS Reader",
+  "webDes": "My RSS dashboard",
+  "keywords": [
+    "example -ignore"
+  ],
+  "notify": {
+    "feishu": {
+      "api": ""
+    },
+    "dingtalk": {
+      "webhook": "",
+      "sign": ""
+    },
+    "telegram": {
+      "api": "https://api.telegram.org/bot${token}/sendMessage",
+      "chat_id": "",
+      "token": ""
+    }
+  },
+  "archives": "archives.txt"
+}

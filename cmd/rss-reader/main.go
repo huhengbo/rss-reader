@@ -29,8 +29,9 @@ func main() {
 		log.Fatalf("create HTTP server: %v", err)
 	}
 
+	configPath := config.Path()
 	go feed.UpdateFeeds(state, archiveStore)
-	go feed.WatchConfigFileChanges("config.json", state, archiveStore)
+	go feed.WatchConfigFileChanges(configPath, state, archiveStore)
 
 	address := fmt.Sprintf(":%d", conf.Port)
 	log.Fatal(http.ListenAndServe(address, httpServer.Handler()))
