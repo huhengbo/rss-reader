@@ -6,15 +6,19 @@ import (
 )
 
 func ParseConf() (Config, error) {
+	return ParseConfFile("config.json")
+}
+
+func ParseConfFile(path string) (Config, error) {
 	var conf Config
-	data, err := os.ReadFile("config.json")
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return conf, err
 	}
-	// 解析JSON数据到Config结构体
-	err = json.Unmarshal(data, &conf)
-
-	return conf, err
+	if err := json.Unmarshal(data, &conf); err != nil {
+		return conf, err
+	}
+	return conf, nil
 }
 
 type Config struct {
@@ -46,14 +50,14 @@ type FeiShu struct {
 	API string `json:"api"`
 }
 
-// Dingtalk 钉钉
+// Dingtalk 钉钉通知配置。
 type Dingtalk struct {
 	//Text string `json:"text"`
 	Webhook string `json:"webhook"`
 	Sign    string `json:"sign"`
 }
 
-// Telegram 电报
+// Telegram 电报通知配置。
 type Telegram struct {
 	ChatId string `json:"chat_id"`
 	//Text   string `json:"text"`
