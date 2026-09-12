@@ -1,0 +1,13 @@
+{
+  "name": "rss-reader-ui-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/ui/*.test.js",
+    "test:e2e": "playwright test",
+    "test:ui-server": "go run ./internal/server/testdata/ui",
+    "check:assets": "node scripts/check-assets.js"
+  },
+  "devDependencies": { "@playwright/test": "1.63.0" },
+  "engines": { "node": ">=22" }
+}
