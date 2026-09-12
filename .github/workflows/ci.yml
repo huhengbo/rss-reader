@@ -100,3 +100,16 @@ jobs:
 
       - name: Build command
         run: go build ./cmd/rss-reader
+
+  docker-build:
+    name: Docker build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build --tag rss-reader:ci .
