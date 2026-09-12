@@ -1,0 +1,10 @@
+.git
+.github
+config.json
+archives.txt
+*.local.json
+bin
+dist
+pc.png
+pc_night.png
+mobile.png
