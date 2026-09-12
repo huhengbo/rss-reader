@@ -22,6 +22,14 @@ go run ./cmd/rss-reader
 
 ## 提交前检查
 
+首次安装漏洞扫描工具：
+
+```bash
+go install golang.org/x/vuln/cmd/govulncheck@latest
+```
+
+提交前运行：
+
 ```bash
 go mod tidy
 gofmt -w .
@@ -47,7 +55,7 @@ docker build -t rss-reader:dev .
 - 接口只在确实存在替换、测试或多实现边界时引入。
 - 外部网络调用必须支持 context 和 timeout。
 - 并发状态必须明确所有权并通过 race test。
-- 对 bug 修复优先先增加回归测试。
+- 对 bug 修复优先增加回归测试。
 - 日志不得输出 token、webhook、带鉴权查询参数的 Feed URL。
 
 ## Commit 与 Pull Request
@@ -60,7 +68,7 @@ feat: add notification provider
 refactor: isolate feed runtime state
 ci: validate Docker image build
 build: publish multi-arch images
- docs: clarify deployment configuration
+docs: clarify deployment configuration
 ```
 
 一个 PR 尽量聚焦一个目标。PR 描述至少说明：
