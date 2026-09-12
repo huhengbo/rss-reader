@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -73,9 +74,10 @@ func TestCheckHandlesEmptyFeedState(t *testing.T) {
 
 	item := &gofeed.Item{Title: "Example item", Link: "https://example.com/post?id=1"}
 	result := &gofeed.Feed{Items: []*gofeed.Item{item}}
+	ctx := context.Background()
 
-	Check(state, archiveStore, feedURL, result, item)
-	Check(state, archiveStore, feedURL, &gofeed.Feed{}, item)
-	Check(state, archiveStore, feedURL, nil, item)
-	Check(state, archiveStore, feedURL, result, nil)
+	Check(ctx, state, archiveStore, feedURL, result, item)
+	Check(ctx, state, archiveStore, feedURL, &gofeed.Feed{}, item)
+	Check(ctx, state, archiveStore, feedURL, nil, item)
+	Check(ctx, state, archiveStore, feedURL, result, nil)
 }

@@ -2,14 +2,15 @@ package notify
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -26,7 +27,12 @@ const (
 	TelegramRoute = "telegram"
 	contentType   = "application/json"
 	tokenReplace  = "${token}"
+
+	maxAttempts         = 3
+	notificationTimeout = 10 * time.Second
 )
+
+var defaultHTTPClient = newHTTPClient()
 
 type Message struct {
 	Routes   []string    `json:"routes"`
@@ -60,43 +66,50 @@ type dingtalkMessageLink struct {
 	Title      string `json:"title"`
 }
 
-func Send(settings config.Notify, msg Message) {
+func Send(ctx context.Context, settings config.Notify, msg Message) {
 	if len(msg.Routes) == 0 {
 		return
 	}
+
 	for _, route := range msg.Routes {
-		switch route {
-		case FeiShuRoute:
-			if settings.FeiShu.API != "" {
-				sendToFeiShu(settings.FeiShu, msg)
-			}
-		case TelegramRoute:
-			if settings.Telegram.Token != "" && settings.Telegram.ChatId != "" {
-				time.Sleep(1500)
-				sendToTelegram(settings.Telegram, msg)
-			}
-		case DingtalkRoute:
-			if settings.Dingtalk.Webhook != "" {
-				time.Sleep(1500)
-				sendToDingtalk(settings.Dingtalk, msg)
-			}
-		default:
-			log.Println("without route")
+		if err := sendRoute(ctx, settings, route, msg); err != nil {
+			log.Printf("notify %s: %v", route, err)
 		}
 	}
 }
 
-func sendToTelegram(settings config.Telegram, msg Message) {
-	finalMsg, err := json.Marshal(telegramMessage{ChatId: settings.ChatId, Text: msg.Content})
-	if err != nil {
-		log.Printf("json marshal err: %+v\n", err)
-		return
+func sendRoute(ctx context.Context, settings config.Notify, route string, msg Message) error {
+	switch route {
+	case FeiShuRoute:
+		if settings.FeiShu.API == "" {
+			return nil
+		}
+		return sendToFeiShu(ctx, settings.FeiShu, msg)
+	case TelegramRoute:
+		if settings.Telegram.Token == "" || settings.Telegram.ChatId == "" {
+			return nil
+		}
+		return sendToTelegram(ctx, settings.Telegram, msg)
+	case DingtalkRoute:
+		if settings.Dingtalk.Webhook == "" {
+			return nil
+		}
+		return sendToDingtalk(ctx, settings.Dingtalk, msg)
+	default:
+		return fmt.Errorf("unknown notification route %q", route)
 	}
-	api := strings.ReplaceAll(settings.API, tokenReplace, settings.Token)
-	requestPost(api, finalMsg)
 }
 
-func sendToDingtalk(settings config.Dingtalk, msg Message) {
+func sendToTelegram(ctx context.Context, settings config.Telegram, msg Message) error {
+	finalMsg, err := json.Marshal(telegramMessage{ChatId: settings.ChatId, Text: msg.Content})
+	if err != nil {
+		return fmt.Errorf("marshal telegram message: %w", err)
+	}
+	api := strings.ReplaceAll(settings.API, tokenReplace, settings.Token)
+	return requestPost(ctx, defaultHTTPClient, api, finalMsg)
+}
+
+func sendToDingtalk(ctx context.Context, settings config.Dingtalk, msg Message) error {
 	encodedSign := ""
 	var timestamp int64
 	if settings.Sign != "" {
@@ -117,44 +130,89 @@ func sendToDingtalk(settings config.Dingtalk, msg Message) {
 		},
 	})
 	if err != nil {
-		log.Printf("json marshal err: %+v\n", err)
-		return
+		return fmt.Errorf("marshal dingtalk message: %w", err)
 	}
+
 	api := settings.Webhook
 	if encodedSign != "" {
 		api = fmt.Sprintf("%s&timestamp=%d&sign=%s", api, timestamp, encodedSign)
 	}
-	requestPost(api, finalMsg)
+	return requestPost(ctx, defaultHTTPClient, api, finalMsg)
 }
 
-func sendToFeiShu(settings config.FeiShu, msg Message) {
+func sendToFeiShu(ctx context.Context, settings config.FeiShu, msg Message) error {
 	finalMsg, err := json.Marshal(feiShuMessage{
 		MsgType: "text",
 		Content: feiShuMessageText{Text: msg.Content},
 	})
 	if err != nil {
-		log.Printf("json marshal err: %+v\n", err)
-		return
+		return fmt.Errorf("marshal feishu message: %w", err)
 	}
-	requestPost(settings.API, finalMsg)
+	return requestPost(ctx, defaultHTTPClient, settings.API, finalMsg)
 }
 
-func requestPost(url string, param []byte) {
-	resp, err := http.Post(url, contentType, bytes.NewBuffer(param))
-	if err != nil {
-		log.Printf("http post err: %+v\n", err)
-		return
-	}
-	defer func(body io.ReadCloser) {
-		if err := body.Close(); err != nil {
-			log.Printf("http body close err: %+v\n", err)
+func requestPost(ctx context.Context, client *http.Client, endpoint string, param []byte) error {
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(param))
+		if err != nil {
+			return fmt.Errorf("create request: %w", err)
 		}
-	}(resp.Body)
+		req.Header.Set("Content-Type", contentType)
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("http post read body err: %+v\n", err)
-		return
+		resp, err := client.Do(req)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			lastErr = err
+			if attempt < maxAttempts {
+				if err := waitRetry(ctx, attempt); err != nil {
+					return err
+				}
+				continue
+			}
+			break
+		}
+
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 32<<10))
+		_ = resp.Body.Close()
+
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			return nil
+		}
+		lastErr = fmt.Errorf("unexpected response status %s", resp.Status)
+		if !retryableStatus(resp.StatusCode) || attempt == maxAttempts {
+			break
+		}
+		if err := waitRetry(ctx, attempt); err != nil {
+			return err
+		}
 	}
-	log.Printf("response status: %s,response body:%s", string(body), resp.Status)
+	return lastErr
+}
+
+func waitRetry(ctx context.Context, attempt int) error {
+	delay := time.Duration(attempt) * 250 * time.Millisecond
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func retryableStatus(status int) bool {
+	return status == http.StatusTooManyRequests || status == http.StatusBadGateway || status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout
+}
+
+func newHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+	transport.TLSHandshakeTimeout = 5 * time.Second
+	transport.ResponseHeaderTimeout = 5 * time.Second
+	transport.IdleConnTimeout = 90 * time.Second
+	return &http.Client{Transport: transport, Timeout: notificationTimeout}
 }

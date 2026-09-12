@@ -1,8 +1,10 @@
 package feed
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -17,26 +19,38 @@ import (
 	appstate "rss-reader/internal/state"
 )
 
-func UpdateFeeds(state *appstate.State, archiveStore *archive.Store) {
-	conf := state.Config()
-	ticker := time.NewTicker(time.Duration(conf.ReFresh) * time.Minute)
-	defer ticker.Stop()
+const feedRequestTimeout = 15 * time.Second
 
+var feedHTTPClient = &http.Client{Timeout: feedRequestTimeout}
+
+func UpdateFeeds(ctx context.Context, state *appstate.State, archiveStore *archive.Store) {
 	for {
 		formattedTime := time.Now().Format("2006-01-02 15:04:05")
-		conf = state.Config()
-		for _, url := range conf.Values {
-			go UpdateFeed(state, archiveStore, url, formattedTime)
+		conf := state.Config()
+		for _, feedURL := range conf.Values {
+			go UpdateFeed(ctx, state, archiveStore, feedURL, formattedTime)
 		}
-		<-ticker.C
+
+		timer := time.NewTimer(time.Duration(conf.ReFresh) * time.Minute)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
 	}
 }
 
-func UpdateFeed(state *appstate.State, archiveStore *archive.Store, feedURL, formattedTime string) {
+func UpdateFeed(ctx context.Context, state *appstate.State, archiveStore *archive.Store, feedURL, formattedTime string) {
 	log.Printf("timer exec get: %s\n", safeURLForLog(feedURL))
-	result, err := gofeed.NewParser().ParseURL(feedURL)
+
+	parser := gofeed.NewParser()
+	parser.Client = feedHTTPClient
+	result, err := parser.ParseURLWithContext(feedURL, ctx)
 	if err != nil {
-		log.Printf("Error fetching feed: %s | %v", safeURLForLog(feedURL), err)
+		if ctx.Err() == nil {
+			log.Printf("Error fetching feed: %s | %v", safeURLForLog(feedURL), err)
+		}
 		return
 	}
 
@@ -57,7 +71,7 @@ func UpdateFeed(state *appstate.State, archiveStore *archive.Store, feedURL, for
 			Title:       item.Title,
 			Description: item.Description,
 		})
-		Check(state, archiveStore, feedURL, result, item)
+		Check(ctx, state, archiveStore, feedURL, result, item)
 	}
 	state.SetFeed(feedURL, customFeed)
 }
@@ -66,7 +80,7 @@ func GetFeeds(state *appstate.State) []domain.Feed {
 	return state.Feeds()
 }
 
-func WatchConfigFileChanges(filePath string, state *appstate.State, archiveStore *archive.Store) {
+func WatchConfigFileChanges(ctx context.Context, filePath string, state *appstate.State, archiveStore *archive.Store) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Printf("create config watcher: %v", err)
@@ -81,6 +95,8 @@ func WatchConfigFileChanges(filePath string, state *appstate.State, archiveStore
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case event, ok := <-watcher.Events:
 			if !ok {
 				return
@@ -108,7 +124,7 @@ func WatchConfigFileChanges(filePath string, state *appstate.State, archiveStore
 
 			formattedTime := time.Now().Format("2006-01-02 15:04:05")
 			for _, feedURL := range conf.Values {
-				go UpdateFeed(state, archiveStore, feedURL, formattedTime)
+				go UpdateFeed(ctx, state, archiveStore, feedURL, formattedTime)
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -119,7 +135,7 @@ func WatchConfigFileChanges(filePath string, state *appstate.State, archiveStore
 	}
 }
 
-func Check(state *appstate.State, archiveStore *archive.Store, feedURL string, result *gofeed.Feed, item *gofeed.Item) {
+func Check(ctx context.Context, state *appstate.State, archiveStore *archive.Store, feedURL string, result *gofeed.Feed, item *gofeed.Item) {
 	if result == nil || item == nil || len(result.Items) == 0 {
 		return
 	}
@@ -145,7 +161,7 @@ func Check(state *appstate.State, archiveStore *archive.Store, feedURL string, r
 			return
 		}
 
-		go notify.Send(conf.Notify, notify.Message{
+		go notify.Send(ctx, conf.Notify, notify.Message{
 			Routes:   []string{notify.FeiShuRoute, notify.TelegramRoute, notify.DingtalkRoute},
 			Content:  fmt.Sprintf("%s\n%s", msg, item.Link),
 			FeedItem: *item,
