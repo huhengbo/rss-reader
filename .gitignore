@@ -2,6 +2,9 @@
 config.json
 archives.txt
 *.local.json
+.env
+.env.*
+!.env.example
 
 # Build and test output
 /bin/
