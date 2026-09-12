@@ -1,0 +1,48 @@
+name: Dependency refresh (temporary)
+
+on:
+  push:
+    branches:
+      - maintenance/dependencies
+    paths:
+      - go.mod
+
+permissions:
+  contents: write
+
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: maintenance/dependencies
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: 1.27.1
+          cache: true
+
+      - name: Refresh dependencies
+        run: |
+          go get github.com/fsnotify/fsnotify@v1.10.1
+          go get github.com/gorilla/websocket@v1.5.3
+          go get github.com/mmcdole/gofeed@v1.4.2
+          go get golang.org/x/net@v0.55.0
+          go mod tidy
+
+      - name: Commit generated module files
+        shell: bash
+        run: |
+          if git diff --quiet -- go.mod go.sum; then
+            echo "No module changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add go.mod go.sum
+          git commit -m "chore: refresh Go module metadata"
+          git push origin HEAD:maintenance/dependencies
