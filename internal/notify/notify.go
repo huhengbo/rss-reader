@@ -1,4 +1,4 @@
-package utils
+package notify
 
 import (
 	"bytes"
@@ -17,15 +17,15 @@ import (
 
 	"github.com/mmcdole/gofeed"
 
-	"rss-reader/models"
+	"rss-reader/internal/config"
 )
 
 const (
 	FeiShuRoute   = "feishu"
 	DingtalkRoute = "dingding"
 	TelegramRoute = "telegram"
-	ContentType   = "application/json"
-	TokenReplace  = "${token}"
+	contentType   = "application/json"
+	tokenReplace  = "${token}"
 )
 
 type Message struct {
@@ -34,51 +34,51 @@ type Message struct {
 	FeedItem gofeed.Item `json:"feedItem"`
 }
 
-type FeiShuMessage struct {
+type feiShuMessage struct {
 	MsgType string            `json:"msg_type"`
-	Content FeiShuMessageText `json:"content"`
+	Content feiShuMessageText `json:"content"`
 }
 
-type FeiShuMessageText struct {
+type feiShuMessageText struct {
 	Text string `json:"text"`
 }
 
-type TelegramMessage struct {
+type telegramMessage struct {
 	ChatId string `json:"chat_id"`
 	Text   string `json:"text"`
 }
 
-type DingtalkMessage struct {
+type dingtalkMessage struct {
 	Msgtype string              `json:"msgtype"`
-	Link    DingtalkMessageLink `json:"link"`
+	Link    dingtalkMessageLink `json:"link"`
 }
 
-type DingtalkMessageLink struct {
+type dingtalkMessageLink struct {
 	MessageUrl string `json:"messageUrl"`
 	PicUrl     string `json:"picUrl"`
 	Text       string `json:"text"`
 	Title      string `json:"title"`
 }
 
-func Notify(config models.Notify, msg Message) {
+func Send(settings config.Notify, msg Message) {
 	if len(msg.Routes) == 0 {
 		return
 	}
 	for _, route := range msg.Routes {
 		switch route {
 		case FeiShuRoute:
-			if config.FeiShu.API != "" {
-				sendToFeiShu(config.FeiShu, msg)
+			if settings.FeiShu.API != "" {
+				sendToFeiShu(settings.FeiShu, msg)
 			}
 		case TelegramRoute:
-			if config.Telegram.Token != "" && config.Telegram.ChatId != "" {
+			if settings.Telegram.Token != "" && settings.Telegram.ChatId != "" {
 				time.Sleep(1500)
-				sendToTelegram(config.Telegram, msg)
+				sendToTelegram(settings.Telegram, msg)
 			}
 		case DingtalkRoute:
-			if config.Dingtalk.Webhook != "" {
+			if settings.Dingtalk.Webhook != "" {
 				time.Sleep(1500)
-				sendToDingtalk(config.Dingtalk, msg)
+				sendToDingtalk(settings.Dingtalk, msg)
 			}
 		default:
 			log.Println("without route")
@@ -86,84 +86,71 @@ func Notify(config models.Notify, msg Message) {
 	}
 }
 
-func sendToTelegram(config models.Telegram, msg Message) {
-	finalMsg, err := json.Marshal(
-		TelegramMessage{
-			ChatId: config.ChatId,
-			Text:   msg.Content,
-		})
+func sendToTelegram(settings config.Telegram, msg Message) {
+	finalMsg, err := json.Marshal(telegramMessage{ChatId: settings.ChatId, Text: msg.Content})
 	if err != nil {
 		log.Printf("json marshal err: %+v\n", err)
 		return
 	}
-	api := strings.ReplaceAll(config.API, TokenReplace, config.Token)
+	api := strings.ReplaceAll(settings.API, tokenReplace, settings.Token)
 	requestPost(api, finalMsg)
 }
 
-func sendToDingtalk(config models.Dingtalk, msg Message) {
+func sendToDingtalk(settings config.Dingtalk, msg Message) {
 	encodedSign := ""
 	var timestamp int64
-	if config.Sign != "" {
+	if settings.Sign != "" {
 		timestamp = time.Now().UnixNano() / int64(time.Millisecond)
-		secret := config.Sign
-		stringToSign := fmt.Sprintf("%d\n%s", timestamp, secret)
-		mac := hmac.New(sha256.New, []byte(secret))
+		stringToSign := fmt.Sprintf("%d\n%s", timestamp, settings.Sign)
+		mac := hmac.New(sha256.New, []byte(settings.Sign))
 		mac.Write([]byte(stringToSign))
-		signData := mac.Sum(nil)
-		sign := base64.StdEncoding.EncodeToString(signData)
+		sign := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 		encodedSign = url.QueryEscape(sign)
 	}
 
-	finalMsg, err := json.Marshal(
-		DingtalkMessage{
-			Msgtype: "link",
-			Link: DingtalkMessageLink{
-				MessageUrl: msg.FeedItem.Link,
-				Title:      msg.FeedItem.Title,
-				Text:       msg.Content,
-			},
-		})
+	finalMsg, err := json.Marshal(dingtalkMessage{
+		Msgtype: "link",
+		Link: dingtalkMessageLink{
+			MessageUrl: msg.FeedItem.Link,
+			Title:      msg.FeedItem.Title,
+			Text:       msg.Content,
+		},
+	})
 	if err != nil {
 		log.Printf("json marshal err: %+v\n", err)
 		return
 	}
-	api := config.Webhook
+	api := settings.Webhook
 	if encodedSign != "" {
 		api = fmt.Sprintf("%s&timestamp=%d&sign=%s", api, timestamp, encodedSign)
 	}
-
 	requestPost(api, finalMsg)
 }
 
-func sendToFeiShu(config models.FeiShu, msg Message) {
-	finalMsg, err := json.Marshal(
-		FeiShuMessage{
-			MsgType: "text",
-			Content: FeiShuMessageText{
-				Text: msg.Content,
-			},
-		})
+func sendToFeiShu(settings config.FeiShu, msg Message) {
+	finalMsg, err := json.Marshal(feiShuMessage{
+		MsgType: "text",
+		Content: feiShuMessageText{Text: msg.Content},
+	})
 	if err != nil {
 		log.Printf("json marshal err: %+v\n", err)
 		return
 	}
-	requestPost(config.API, finalMsg)
+	requestPost(settings.API, finalMsg)
 }
 
 func requestPost(url string, param []byte) {
-	requestBody := bytes.NewBuffer(param)
-	resp, err := http.Post(url, ContentType, requestBody)
-
+	resp, err := http.Post(url, contentType, bytes.NewBuffer(param))
 	if err != nil {
 		log.Printf("http post err: %+v\n", err)
 		return
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
+	defer func(body io.ReadCloser) {
+		if err := body.Close(); err != nil {
 			log.Printf("http body close err: %+v\n", err)
 		}
 	}(resp.Body)
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("http post read body err: %+v\n", err)

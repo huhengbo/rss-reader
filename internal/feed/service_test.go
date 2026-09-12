@@ -1,4 +1,4 @@
-package utils
+package feed
 
 import (
 	"path/filepath"
@@ -7,20 +7,21 @@ import (
 	"github.com/mmcdole/gofeed"
 
 	"rss-reader/internal/archive"
+	"rss-reader/internal/config"
+	"rss-reader/internal/domain"
 	appstate "rss-reader/internal/state"
-	"rss-reader/models"
 )
 
 func TestGetFeedsPreservesConfiguredOrderAndSkipsMissing(t *testing.T) {
-	state := appstate.New(models.Config{
+	state := appstate.New(config.Config{
 		Values: []string{
 			"https://example.com/first.xml",
 			"https://example.com/missing.xml",
 			"https://example.com/second.xml",
 		},
 	})
-	state.SetFeed("https://example.com/first.xml", models.Feed{Title: "First"})
-	state.SetFeed("https://example.com/second.xml", models.Feed{Title: "Second"})
+	state.SetFeed("https://example.com/first.xml", domain.Feed{Title: "First"})
+	state.SetFeed("https://example.com/second.xml", domain.Feed{Title: "Second"})
 
 	feeds := GetFeeds(state)
 	if len(feeds) != 2 {
@@ -37,26 +38,10 @@ func TestNormalizeLink(t *testing.T) {
 		input string
 		want  string
 	}{
-		{
-			name:  "trims surrounding whitespace",
-			input: "  https://example.com/post  ",
-			want:  "https://example.com/post",
-		},
-		{
-			name:  "removes query parameters",
-			input: "https://example.com/post?utm_source=rss&id=1",
-			want:  "https://example.com/post",
-		},
-		{
-			name:  "removes fragment",
-			input: "https://example.com/post#comments",
-			want:  "https://example.com/post",
-		},
-		{
-			name:  "removes query and fragment",
-			input: "https://example.com/post?id=1#comments",
-			want:  "https://example.com/post",
-		},
+		{name: "trims surrounding whitespace", input: "  https://example.com/post  ", want: "https://example.com/post"},
+		{name: "removes query parameters", input: "https://example.com/post?utm_source=rss&id=1", want: "https://example.com/post"},
+		{name: "removes fragment", input: "https://example.com/post#comments", want: "https://example.com/post"},
+		{name: "removes query and fragment", input: "https://example.com/post?id=1#comments", want: "https://example.com/post"},
 	}
 
 	for _, tt := range tests {
@@ -70,18 +55,15 @@ func TestNormalizeLink(t *testing.T) {
 
 func TestCheckHandlesEmptyFeedState(t *testing.T) {
 	const feedURL = "https://example.com/feed.xml"
-	state := appstate.New(models.Config{Keywords: []string{"never-match-this-title"}})
-	state.SetFeed(feedURL, models.Feed{Title: "Cached feed", Items: nil})
+	state := appstate.New(config.Config{Keywords: []string{"never-match-this-title"}})
+	state.SetFeed(feedURL, domain.Feed{Title: "Cached feed", Items: nil})
 
 	archiveStore, err := archive.Open(filepath.Join(t.TempDir(), "archives.txt"))
 	if err != nil {
 		t.Fatalf("archive.Open() error = %v", err)
 	}
 
-	item := &gofeed.Item{
-		Title: "Example item",
-		Link:  "https://example.com/post?id=1",
-	}
+	item := &gofeed.Item{Title: "Example item", Link: "https://example.com/post?id=1"}
 	result := &gofeed.Feed{Items: []*gofeed.Item{item}}
 
 	Check(state, archiveStore, feedURL, result, item)

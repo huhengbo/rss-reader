@@ -1,4 +1,4 @@
-package models
+package domain
 
 type Feed struct {
 	Title  string            `json:"title,omitempty"`

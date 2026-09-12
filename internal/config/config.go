@@ -1,15 +1,15 @@
-package models
+package config
 
 import (
 	"encoding/json"
 	"os"
 )
 
-func ParseConf() (Config, error) {
-	return ParseConfFile("config.json")
+func Load() (Config, error) {
+	return LoadFile("config.json")
 }
 
-func ParseConfFile(path string) (Config, error) {
+func LoadFile(path string) (Config, error) {
 	var conf Config
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -32,54 +32,44 @@ type Config struct {
 	WebTitle   string `json:"webTitle"`
 	WebDes     string `json:"webDes"`
 
-	Keywords []string `json:"keywords"` // 关键词
-	Notify   Notify   `json:"notify"`   // 通知方式
-	Archives string   `json:"archives"` // 通知方式
+	Keywords []string `json:"keywords"`
+	Notify   Notify   `json:"notify"`
+	Archives string   `json:"archives"`
 }
 
-// Notify 通知方式
 type Notify struct {
 	FeiShu   FeiShu   `json:"feishu"`
 	Telegram Telegram `json:"telegram"`
 	Dingtalk Dingtalk `json:"dingtalk"`
 }
 
-// FeiShu 飞书
 type FeiShu struct {
-	//Text string `json:"text"`
 	API string `json:"api"`
 }
 
-// Dingtalk 钉钉通知配置。
 type Dingtalk struct {
-	//Text string `json:"text"`
 	Webhook string `json:"webhook"`
 	Sign    string `json:"sign"`
 }
 
-// Telegram 电报通知配置。
 type Telegram struct {
 	ChatId string `json:"chat_id"`
-	//Text   string `json:"text"`
-	API   string `json:"api"`
-	Token string `json:"token"`
+	API    string `json:"api"`
+	Token  string `json:"token"`
 }
 
 func (older Config) GetIncrement(newer Config) []string {
-	var (
-		urlMap    = make(map[string]struct{})
-		increment = make([]string, 0, len(newer.Values))
-	)
+	urlMap := make(map[string]struct{})
+	increment := make([]string, 0, len(newer.Values))
+
 	for _, item := range older.Values {
 		urlMap[item] = struct{}{}
 	}
-
 	for _, item := range newer.Values {
 		if _, ok := urlMap[item]; ok {
 			continue
 		}
 		increment = append(increment, item)
 	}
-
 	return increment
 }

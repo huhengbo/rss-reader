@@ -1,4 +1,4 @@
-package models
+package config
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestParseConfFile(t *testing.T) {
+func TestLoadFile(t *testing.T) {
 	t.Run("parses valid config", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
 		content := `{
@@ -30,12 +30,12 @@ func TestParseConfFile(t *testing.T) {
 			t.Fatalf("write config: %v", err)
 		}
 
-		conf, err := ParseConfFile(path)
+		conf, err := LoadFile(path)
 		if err != nil {
-			t.Fatalf("ParseConfFile() error = %v", err)
+			t.Fatalf("LoadFile() error = %v", err)
 		}
 		if conf.Port != 8080 || conf.ReFresh != 5 || conf.WebTitle != "RSS Reader" {
-			t.Fatalf("ParseConfFile() returned unexpected config: %#v", conf)
+			t.Fatalf("LoadFile() returned unexpected config: %#v", conf)
 		}
 		if !reflect.DeepEqual(conf.Values, []string{"https://example.com/feed.xml"}) {
 			t.Fatalf("values = %#v", conf.Values)
@@ -47,15 +47,15 @@ func TestParseConfFile(t *testing.T) {
 		if err := os.WriteFile(path, []byte(`{"port":`), 0o600); err != nil {
 			t.Fatalf("write config: %v", err)
 		}
-		if _, err := ParseConfFile(path); err == nil {
-			t.Fatal("ParseConfFile() error = nil, want non-nil")
+		if _, err := LoadFile(path); err == nil {
+			t.Fatal("LoadFile() error = nil, want non-nil")
 		}
 	})
 
 	t.Run("returns error for missing file", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "missing.json")
-		if _, err := ParseConfFile(path); err == nil {
-			t.Fatal("ParseConfFile() error = nil, want non-nil")
+		if _, err := LoadFile(path); err == nil {
+			t.Fatal("LoadFile() error = nil, want non-nil")
 		}
 	})
 }

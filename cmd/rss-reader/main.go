@@ -11,26 +11,27 @@ import (
 	"github.com/gorilla/websocket"
 
 	"rss-reader/internal/archive"
+	"rss-reader/internal/config"
+	"rss-reader/internal/domain"
+	"rss-reader/internal/feed"
 	appstate "rss-reader/internal/state"
 	"rss-reader/internal/web"
-	"rss-reader/models"
-	"rss-reader/utils"
 )
 
 func main() {
-	config, err := models.ParseConf()
+	conf, err := config.Load()
 	if err != nil {
 		log.Fatalf("load configuration: %v", err)
 	}
 
-	state := appstate.New(config)
-	archiveStore, err := archive.Open(config.Archives)
+	state := appstate.New(conf)
+	archiveStore, err := archive.Open(conf.Archives)
 	if err != nil {
 		log.Fatalf("open archive store: %v", err)
 	}
 
-	go utils.UpdateFeeds(state, archiveStore)
-	go utils.WatchConfigFileChanges("config.json", state, archiveStore)
+	go feed.UpdateFeeds(state, archiveStore)
+	go feed.WatchConfigFileChanges("config.json", state, archiveStore)
 
 	upgrader := &websocket.Upgrader{}
 	mux := http.NewServeMux()
@@ -47,7 +48,7 @@ func main() {
 	fs := http.FileServer(http.FS(web.Static))
 	mux.Handle("/static/", fs)
 
-	serve := fmt.Sprintf(":%d", config.Port)
+	serve := fmt.Sprintf(":%d", conf.Port)
 	log.Fatal(http.ListenAndServe(serve, mux))
 }
 
@@ -65,21 +66,21 @@ func tplHandler(state *appstate.State, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	config := state.Config()
+	conf := state.Config()
 	data := struct {
 		Keywords       string
-		RssDataList    []models.Feed
+		RssDataList    []domain.Feed
 		AutoUpdatePush int
 		ListHeight     int
 		WebTitle       string
 		WebDes         string
 	}{
 		Keywords:       getKeywords(state),
-		RssDataList:    utils.GetFeeds(state),
-		AutoUpdatePush: config.AutoUpdatePush,
-		ListHeight:     config.ListHeight,
-		WebTitle:       config.WebTitle,
-		WebDes:         config.WebDes,
+		RssDataList:    feed.GetFeeds(state),
+		AutoUpdatePush: conf.AutoUpdatePush,
+		ListHeight:     conf.ListHeight,
+		WebTitle:       conf.WebTitle,
+		WebDes:         conf.WebDes,
 	}
 
 	if err := tmpl.Execute(w, data); err != nil {
@@ -96,8 +97,8 @@ func wsHandler(state *appstate.State, upgrader *websocket.Upgrader, w http.Respo
 	defer conn.Close()
 
 	for {
-		config := state.Config()
-		for _, url := range config.Values {
+		conf := state.Config()
+		for _, url := range conf.Values {
 			cache, ok := state.Feed(url)
 			if !ok {
 				log.Printf("Error getting feed from db is null %v", url)
@@ -108,24 +109,23 @@ func wsHandler(state *appstate.State, upgrader *websocket.Upgrader, w http.Respo
 				log.Printf("json marshal failure: %s", err.Error())
 				continue
 			}
-
 			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 				log.Printf("Error sending message or Connection closed: %v", err)
 				return
 			}
 		}
 
-		if config.AutoUpdatePush == 0 {
+		if conf.AutoUpdatePush == 0 {
 			return
 		}
-		time.Sleep(time.Duration(config.AutoUpdatePush) * time.Minute)
+		time.Sleep(time.Duration(conf.AutoUpdatePush) * time.Minute)
 	}
 }
 
 func getKeywords(state *appstate.State) string {
 	words := ""
-	config := state.Config()
-	for _, url := range config.Values {
+	conf := state.Config()
+	for _, url := range conf.Values {
 		cache, ok := state.Feed(url)
 		if !ok {
 			continue
@@ -138,7 +138,7 @@ func getKeywords(state *appstate.State) string {
 }
 
 func getFeedsHandler(state *appstate.State, w http.ResponseWriter, r *http.Request) {
-	feeds := utils.GetFeeds(state)
+	feeds := feed.GetFeeds(state)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(feeds); err != nil {
 		log.Printf("encode feeds response: %v", err)
