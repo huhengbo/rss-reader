@@ -1,11 +1,16 @@
-version: "3"
-
 services:
-  server:
-    image: huhengbo1992/rss-reader:latest
-    container_name: rss-reader
-    restart: always
+  rss-reader:
+    image: ${RSS_READER_IMAGE:-ghcr.io/huhengbo/rss-reader:latest}
+    restart: unless-stopped
     ports:
-      - "9898:8080"
+      - "${RSS_READER_PORT:-9898}:8080"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      RSS_READER_CONFIG: /app/config.json
+      RSS_READER_ARCHIVES: /data/archives.txt
     volumes:
-      - "$PWD/config.json:/app/config.json"
+      - ./config.json:/app/config.json:ro
+      - rss-reader-data:/data
+
+volumes:
+  rss-reader-data:
