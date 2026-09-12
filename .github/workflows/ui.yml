@@ -40,7 +40,9 @@ jobs:
       - name: Install browser
         run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Browser regression tests
-        run: npm run test:e2e -- --project=${{ matrix.browser }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: artifacts/browser-results.json
+        run: npm run test:e2e -- --project=${{ matrix.browser }} --reporter=list,html,json
       - name: Upload traces, reports and review screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -49,5 +51,6 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            artifacts/
           retention-days: 7
           if-no-files-found: ignore
