@@ -3,6 +3,7 @@ package feed
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 	"time"
 
@@ -31,15 +32,15 @@ func UpdateFeeds(state *appstate.State, archiveStore *archive.Store) {
 	}
 }
 
-func UpdateFeed(state *appstate.State, archiveStore *archive.Store, url, formattedTime string) {
-	log.Printf("timer exec get: %s\n", url)
-	result, err := gofeed.NewParser().ParseURL(url)
+func UpdateFeed(state *appstate.State, archiveStore *archive.Store, feedURL, formattedTime string) {
+	log.Printf("timer exec get: %s\n", safeURLForLog(feedURL))
+	result, err := gofeed.NewParser().ParseURL(feedURL)
 	if err != nil {
-		log.Printf("Error fetching feed: %v | %v", url, err)
+		log.Printf("Error fetching feed: %s | %v", safeURLForLog(feedURL), err)
 		return
 	}
 
-	cache, ok := state.Feed(url)
+	cache, ok := state.Feed(feedURL)
 	if ok && len(result.Items) > 0 && len(cache.Items) > 0 && result.Items[0].Link == cache.Items[0].Link {
 		return
 	}
@@ -56,9 +57,9 @@ func UpdateFeed(state *appstate.State, archiveStore *archive.Store, url, formatt
 			Title:       item.Title,
 			Description: item.Description,
 		})
-		Check(state, archiveStore, url, result, item)
+		Check(state, archiveStore, feedURL, result, item)
 	}
-	state.SetFeed(url, customFeed)
+	state.SetFeed(feedURL, customFeed)
 }
 
 func GetFeeds(state *appstate.State) []domain.Feed {
@@ -106,8 +107,8 @@ func WatchConfigFileChanges(filePath string, state *appstate.State, archiveStore
 			log.Println("configuration reloaded")
 
 			formattedTime := time.Now().Format("2006-01-02 15:04:05")
-			for _, url := range conf.Values {
-				go UpdateFeed(state, archiveStore, url, formattedTime)
+			for _, feedURL := range conf.Values {
+				go UpdateFeed(state, archiveStore, feedURL, formattedTime)
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -118,12 +119,12 @@ func WatchConfigFileChanges(filePath string, state *appstate.State, archiveStore
 	}
 }
 
-func Check(state *appstate.State, archiveStore *archive.Store, url string, result *gofeed.Feed, item *gofeed.Item) {
+func Check(state *appstate.State, archiveStore *archive.Store, feedURL string, result *gofeed.Feed, item *gofeed.Item) {
 	if result == nil || item == nil || len(result.Items) == 0 {
 		return
 	}
 
-	cache, cacheOK := state.Feed(url)
+	cache, cacheOK := state.Feed(feedURL)
 	if cacheOK && len(cache.Items) > 0 && cache.Items[0].Link == result.Items[0].Link {
 		return
 	}
@@ -161,4 +162,15 @@ func normalizeLink(link string) string {
 		link = link[:index]
 	}
 	return link
+}
+
+func safeURLForLog(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "<invalid-feed-url>"
+	}
+	parsed.User = nil
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
 }
