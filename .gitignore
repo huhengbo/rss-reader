@@ -1,13 +1,18 @@
-# Default ignored files
+# Runtime configuration and state
+config.json
+archives.txt
+*.local.json
+
+# Build output
+/bin/
+/dist/
+
+# Editors and OS files
+.DS_Store
+.idea/
+.vscode/
 /shelf/
 /workspace.xml
-# Editor-based HTTP Client requests
 /httpRequests/
-# Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
-
-
-.DS_Store
-
-.idea
