@@ -42,7 +42,7 @@ jobs:
       - name: Browser regression tests
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: artifacts/browser-results.json
-        run: npm run test:e2e -- --project=${{ matrix.browser }} --reporter=list,html,json
+        run: npm run test:e2e -- --project=${{ matrix.browser }} ${{ matrix.browser == 'chromium' && '--project=chromium-zoom' || '' }} --reporter=list,html,json
       - name: Upload traces, reports and review screenshots
         if: always()
         uses: actions/upload-artifact@v4

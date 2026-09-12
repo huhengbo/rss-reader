@@ -18,7 +18,9 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } }
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    // Native tab zoom requires a separate persistent Chromium context.
+    { name: 'chromium-zoom', testDir: './tests/zoom', use: { browserName: 'chromium' } }
   ],
   webServer: {
     command: 'go run ./internal/server/testdata/ui',
