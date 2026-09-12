@@ -1,17 +1,8 @@
 package utils
 
-import (
-	"testing"
-
-	"rss-reader/globals"
-)
+import "testing"
 
 func TestMatchStr(t *testing.T) {
-	original := globals.MatchList
-	defer func() {
-		globals.MatchList = original
-	}()
-
 	tests := []struct {
 		name     string
 		patterns []string
@@ -46,10 +37,8 @@ func TestMatchStr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			globals.MatchList = append([]string(nil), tt.patterns...)
-
 			hits := 0
-			MatchStr(tt.input, func(string) {
+			MatchStr(tt.input, tt.patterns, func(string) {
 				hits++
 			})
 

@@ -7,15 +7,17 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/mmcdole/gofeed"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
-	"rss-reader/globals"
 	"strings"
 	"time"
+
+	"github.com/mmcdole/gofeed"
+
+	"rss-reader/models"
 )
 
 const (
@@ -50,6 +52,7 @@ type DingtalkMessage struct {
 	Msgtype string              `json:"msgtype"`
 	Link    DingtalkMessageLink `json:"link"`
 }
+
 type DingtalkMessageLink struct {
 	MessageUrl string `json:"messageUrl"`
 	PicUrl     string `json:"picUrl"`
@@ -57,63 +60,57 @@ type DingtalkMessageLink struct {
 	Title      string `json:"title"`
 }
 
-func Notify(msg Message) {
-	if msg.Routes == nil || len(msg.Routes) == 0 {
+func Notify(config models.Notify, msg Message) {
+	if len(msg.Routes) == 0 {
 		return
 	}
 	for _, route := range msg.Routes {
 		switch route {
 		case FeiShuRoute:
-			if globals.RssUrls.Notify.FeiShu.API != "" {
-				sendToFeiShu(msg)
+			if config.FeiShu.API != "" {
+				sendToFeiShu(config.FeiShu, msg)
 			}
 		case TelegramRoute:
-			if globals.RssUrls.Notify.Telegram.Token != "" && globals.RssUrls.Notify.Telegram.ChatId != "" {
+			if config.Telegram.Token != "" && config.Telegram.ChatId != "" {
 				time.Sleep(1500)
-				sendToTelegram(msg)
+				sendToTelegram(config.Telegram, msg)
 			}
 		case DingtalkRoute:
-			if globals.RssUrls.Notify.Dingtalk.Webhook != "" {
+			if config.Dingtalk.Webhook != "" {
 				time.Sleep(1500)
-				sendToDingtalk(msg)
+				sendToDingtalk(config.Dingtalk, msg)
 			}
 		default:
 			log.Println("without route")
 		}
 	}
 }
-func sendToTelegram(msg Message) {
+
+func sendToTelegram(config models.Telegram, msg Message) {
 	finalMsg, err := json.Marshal(
 		TelegramMessage{
-			ChatId: globals.RssUrls.Notify.Telegram.ChatId,
+			ChatId: config.ChatId,
 			Text:   msg.Content,
 		})
 	if err != nil {
 		log.Printf("json marshal err: %+v\n", err)
 		return
 	}
-	api := strings.ReplaceAll(globals.RssUrls.Notify.Telegram.API, TokenReplace, globals.RssUrls.Notify.Telegram.Token)
+	api := strings.ReplaceAll(config.API, TokenReplace, config.Token)
 	requestPost(api, finalMsg)
 }
 
-func sendToDingtalk(msg Message) {
-	//签名
+func sendToDingtalk(config models.Dingtalk, msg Message) {
 	encodedSign := ""
 	var timestamp int64
-	if globals.RssUrls.Notify.Dingtalk.Sign != "" {
-
-		// 获取当前时间戳（毫秒）
+	if config.Sign != "" {
 		timestamp = time.Now().UnixNano() / int64(time.Millisecond)
-		secret := globals.RssUrls.Notify.Dingtalk.Sign
-		// 拼接字符串
+		secret := config.Sign
 		stringToSign := fmt.Sprintf("%d\n%s", timestamp, secret)
-		// 计算HMAC-SHA256签名
 		mac := hmac.New(sha256.New, []byte(secret))
 		mac.Write([]byte(stringToSign))
 		signData := mac.Sum(nil)
-		// 进行Base64编码
 		sign := base64.StdEncoding.EncodeToString(signData)
-		// 对签名进行URL编码
 		encodedSign = url.QueryEscape(sign)
 	}
 
@@ -130,7 +127,7 @@ func sendToDingtalk(msg Message) {
 		log.Printf("json marshal err: %+v\n", err)
 		return
 	}
-	api := globals.RssUrls.Notify.Dingtalk.Webhook
+	api := config.Webhook
 	if encodedSign != "" {
 		api = fmt.Sprintf("%s&timestamp=%d&sign=%s", api, timestamp, encodedSign)
 	}
@@ -138,7 +135,7 @@ func sendToDingtalk(msg Message) {
 	requestPost(api, finalMsg)
 }
 
-func sendToFeiShu(msg Message) {
+func sendToFeiShu(config models.FeiShu, msg Message) {
 	finalMsg, err := json.Marshal(
 		FeiShuMessage{
 			MsgType: "text",
@@ -150,7 +147,7 @@ func sendToFeiShu(msg Message) {
 		log.Printf("json marshal err: %+v\n", err)
 		return
 	}
-	requestPost(globals.RssUrls.Notify.FeiShu.API, finalMsg)
+	requestPost(config.API, finalMsg)
 }
 
 func requestPost(url string, param []byte) {
@@ -167,12 +164,10 @@ func requestPost(url string, param []byte) {
 			log.Printf("http body close err: %+v\n", err)
 		}
 	}(resp.Body)
-	body, err := ioutil.ReadAll(resp.Body) // 读取响应内容
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("http post read body err: %+v\n", err)
 		return
 	}
 	log.Printf("response status: %s,response body:%s", string(body), resp.Status)
-	//string(body)
-	return
 }

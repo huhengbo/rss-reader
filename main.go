@@ -6,57 +6,66 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"rss-reader/globals"
-	"rss-reader/models"
-
-	"rss-reader/utils"
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"rss-reader/globals"
+	"rss-reader/internal/archive"
+	appstate "rss-reader/internal/state"
+	"rss-reader/models"
+	"rss-reader/utils"
 )
 
-func init() {
-	globals.Init()
-}
-
 func main() {
-	go utils.UpdateFeeds()
-	go utils.WatchConfigFileChanges("config.json")
-	http.HandleFunc("/feeds", getFeedsHandler)
-	http.HandleFunc("/ws", wsHandler)
-	// http.HandleFunc("/", serveHome)
-	http.HandleFunc("/", tplHandler)
+	config, err := models.ParseConf()
+	if err != nil {
+		log.Fatalf("load configuration: %v", err)
+	}
 
-	//加载静态文件
+	state := appstate.New(config)
+	archiveStore, err := archive.Open(config.Archives)
+	if err != nil {
+		log.Fatalf("open archive store: %v", err)
+	}
+
+	go utils.UpdateFeeds(state, archiveStore)
+	go utils.WatchConfigFileChanges("config.json", state, archiveStore)
+
+	upgrader := &websocket.Upgrader{}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/feeds", func(w http.ResponseWriter, r *http.Request) {
+		getFeedsHandler(state, w, r)
+	})
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		wsHandler(state, upgrader, w, r)
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		tplHandler(state, w, r)
+	})
+
 	fs := http.FileServer(http.FS(globals.DirStatic))
-	http.Handle("/static/", fs)
-	port := globals.RssUrls.Port
-	serve := fmt.Sprintf("%s%d", ":", port)
-	log.Fatal(http.ListenAndServe(serve, nil))
+	mux.Handle("/static/", fs)
+
+	serve := fmt.Sprintf(":%d", config.Port)
+	log.Fatal(http.ListenAndServe(serve, mux))
 }
 
-func serveHome(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Content-Type", "text/html; charset=utf-8")
-	w.Write(globals.HtmlContent)
-}
-
-func tplHandler(w http.ResponseWriter, r *http.Request) {
-	// 创建一个新的模板，并设置自定义分隔符为<< >>，避免与Vue的语法冲突
+func tplHandler(state *appstate.State, w http.ResponseWriter, r *http.Request) {
 	tmplInstance := template.New("index.html").Delims("<<", ">>")
-	//添加加法函数计数
 	funcMap := template.FuncMap{
 		"inc": func(i int) int {
 			return i + 1
 		},
 	}
-	// 加载模板文件
 	tmpl, err := tmplInstance.Funcs(funcMap).ParseFS(globals.DirStatic, "static/index.html")
 	if err != nil {
 		log.Println("模板加载错误:", err)
+		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
 
-	// 定义一个数据对象
+	config := state.Config()
 	data := struct {
 		Keywords       string
 		RssDataList    []models.Feed
@@ -65,34 +74,31 @@ func tplHandler(w http.ResponseWriter, r *http.Request) {
 		WebTitle       string
 		WebDes         string
 	}{
-		Keywords:       getKeywords(),
-		RssDataList:    utils.GetFeeds(),
-		AutoUpdatePush: globals.RssUrls.AutoUpdatePush,
-		ListHeight:     globals.RssUrls.ListHeight,
-		WebTitle:       globals.RssUrls.WebTitle,
-		WebDes:         globals.RssUrls.WebDes,
+		Keywords:       getKeywords(state),
+		RssDataList:    utils.GetFeeds(state),
+		AutoUpdatePush: config.AutoUpdatePush,
+		ListHeight:     config.ListHeight,
+		WebTitle:       config.WebTitle,
+		WebDes:         config.WebDes,
 	}
 
-	// 渲染模板并将结果写入响应
-	err = tmpl.Execute(w, data)
-	if err != nil {
+	if err := tmpl.Execute(w, data); err != nil {
 		log.Println("模板渲染错误:", err)
 	}
 }
 
-func wsHandler(w http.ResponseWriter, r *http.Request) {
-	conn, err := globals.Upgrader.Upgrade(w, r, nil)
+func wsHandler(state *appstate.State, upgrader *websocket.Upgrader, w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("Upgrade failed: %v", err)
 		return
 	}
-
 	defer conn.Close()
+
 	for {
-		for _, url := range globals.RssUrls.Values {
-			globals.Lock.RLock()
-			cache, ok := globals.DbMap[url]
-			globals.Lock.RUnlock()
+		config := state.Config()
+		for _, url := range config.Values {
+			cache, ok := state.Feed(url)
 			if !ok {
 				log.Printf("Error getting feed from db is null %v", url)
 				continue
@@ -103,31 +109,25 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			err = conn.WriteMessage(websocket.TextMessage, data)
-			//错误直接关闭更新
-			if err != nil {
+			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 				log.Printf("Error sending message or Connection closed: %v", err)
 				return
 			}
 		}
-		//如果未配置则不自动更新
-		if globals.RssUrls.AutoUpdatePush == 0 {
+
+		if config.AutoUpdatePush == 0 {
 			return
 		}
-		time.Sleep(time.Duration(globals.RssUrls.AutoUpdatePush) * time.Minute)
+		time.Sleep(time.Duration(config.AutoUpdatePush) * time.Minute)
 	}
 }
 
-// 获取关键词也就是title
-// 获取feeds列表
-func getKeywords() string {
+func getKeywords(state *appstate.State) string {
 	words := ""
-	for _, url := range globals.RssUrls.Values {
-		globals.Lock.RLock()
-		cache, ok := globals.DbMap[url]
-		globals.Lock.RUnlock()
+	config := state.Config()
+	for _, url := range config.Values {
+		cache, ok := state.Feed(url)
 		if !ok {
-			log.Printf("Error getting feed from db is null %v", url)
 			continue
 		}
 		if cache.Title != "" {
@@ -137,9 +137,10 @@ func getKeywords() string {
 	return words
 }
 
-func getFeedsHandler(w http.ResponseWriter, r *http.Request) {
-	feeds := utils.GetFeeds()
-
+func getFeedsHandler(state *appstate.State, w http.ResponseWriter, r *http.Request) {
+	feeds := utils.GetFeeds(state)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(feeds)
+	if err := json.NewEncoder(w).Encode(feeds); err != nil {
+		log.Printf("encode feeds response: %v", err)
+	}
 }

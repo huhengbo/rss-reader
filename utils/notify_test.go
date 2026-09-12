@@ -7,16 +7,10 @@ import (
 
 	"github.com/mmcdole/gofeed"
 
-	"rss-reader/globals"
 	"rss-reader/models"
 )
 
 func TestNotifyRoutesToConfiguredProviders(t *testing.T) {
-	originalConfig := globals.RssUrls
-	defer func() {
-		globals.RssUrls = originalConfig
-	}()
-
 	tests := []struct {
 		name         string
 		route        string
@@ -70,9 +64,8 @@ func TestNotifyRoutesToConfiguredProviders(t *testing.T) {
 			}))
 			defer server.Close()
 
-			globals.RssUrls = models.Config{Notify: tt.configure(server.URL)}
-
-			Notify(Message{
+			notifyConfig := tt.configure(server.URL)
+			Notify(notifyConfig, Message{
 				Routes:  []string{tt.route},
 				Content: "test notification",
 				FeedItem: gofeed.Item{

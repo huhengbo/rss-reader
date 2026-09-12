@@ -9,163 +9,147 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/mmcdole/gofeed"
 
-	"rss-reader/globals"
+	"rss-reader/internal/archive"
+	appstate "rss-reader/internal/state"
 	"rss-reader/models"
 )
 
-func UpdateFeeds() {
-	var (
-		tick = time.Tick(time.Duration(globals.RssUrls.ReFresh) * time.Minute)
-	)
+func UpdateFeeds(state *appstate.State, archiveStore *archive.Store) {
+	config := state.Config()
+	ticker := time.NewTicker(time.Duration(config.ReFresh) * time.Minute)
+	defer ticker.Stop()
+
 	for {
 		formattedTime := time.Now().Format("2006-01-02 15:04:05")
-		for _, url := range globals.RssUrls.Values {
-			go UpdateFeed(url, formattedTime)
+		config = state.Config()
+		for _, url := range config.Values {
+			go UpdateFeed(state, archiveStore, url, formattedTime)
 		}
-		<-tick
+		<-ticker.C
 	}
 }
 
-func UpdateFeed(url, formattedTime string) {
+func UpdateFeed(state *appstate.State, archiveStore *archive.Store, url, formattedTime string) {
 	log.Printf("timer exec get: %s\n", url)
-	result, err := globals.Fp.ParseURL(url)
+	result, err := gofeed.NewParser().ParseURL(url)
 	if err != nil {
 		log.Printf("Error fetching feed: %v | %v", url, err)
 		return
 	}
 
-	globals.Lock.RLock()
-	cache, ok := globals.DbMap[url]
-	globals.Lock.RUnlock()
-
-	// feed内容无更新时无需更新缓存
+	cache, ok := state.Feed(url)
 	if ok &&
 		len(result.Items) > 0 &&
 		len(cache.Items) > 0 &&
 		result.Items[0].Link == cache.Items[0].Link {
 		return
 	}
+
 	customFeed := models.Feed{
 		Title:  result.Title,
 		Link:   result.Link,
 		Custom: map[string]string{"lastupdate": formattedTime},
 		Items:  make([]models.Item, 0, len(result.Items)),
 	}
-	for _, v := range result.Items {
+	for _, item := range result.Items {
 		customFeed.Items = append(customFeed.Items, models.Item{
-			Link:        v.Link,
-			Title:       v.Title,
-			Description: v.Description,
+			Link:        item.Link,
+			Title:       item.Title,
+			Description: item.Description,
 		})
-		Check(url, result, v)
+		Check(state, archiveStore, url, result, item)
 	}
-	globals.Lock.Lock()
-	defer globals.Lock.Unlock()
-	globals.DbMap[url] = customFeed
+	state.SetFeed(url, customFeed)
 }
 
-// GetFeeds 获取feeds列表
-func GetFeeds() []models.Feed {
-	feeds := make([]models.Feed, 0, len(globals.RssUrls.Values))
-	for _, url := range globals.RssUrls.Values {
-		globals.Lock.RLock()
-		cache, ok := globals.DbMap[url]
-		globals.Lock.RUnlock()
-		if !ok {
-			log.Printf("Error getting feed from db is null %v", url)
-			continue
-		}
-
-		feeds = append(feeds, cache)
-	}
-	return feeds
+func GetFeeds(state *appstate.State) []models.Feed {
+	return state.Feeds()
 }
 
-func WatchConfigFileChanges(filePath string) {
-	// 创建一个新的监控器
+func WatchConfigFileChanges(filePath string, state *appstate.State, archiveStore *archive.Store) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("create config watcher: %v", err)
+		return
 	}
 	defer watcher.Close()
 
-	// 添加要监控的文件
-	err = watcher.Add(filePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// 启动一个 goroutine 来处理文件变化事件
-	go func() {
-		for {
-			time.Sleep(7 * time.Second)
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					log.Println("通道关闭1")
-					return
-				}
-				if event.Op&fsnotify.Write == fsnotify.Write {
-					log.Println("文件已修改")
-					globals.Init()
-					formattedTime := time.Now().Format("2006-01-02 15:04:05")
-					for _, url := range globals.RssUrls.Values {
-						go UpdateFeed(url, formattedTime)
-					}
-				}
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					log.Println("通道关闭2")
-					return
-				}
-				log.Println("错误:", err)
-				return
-			}
-		}
-	}()
-
-	select {}
-}
-
-func Check(url string, result *gofeed.Feed, v *gofeed.Item) {
-	if result == nil || v == nil || len(result.Items) == 0 {
+	if err := watcher.Add(filePath); err != nil {
+		log.Printf("watch config file %q: %v", filePath, err)
 		return
 	}
 
-	globals.Lock.RLock()
-	cache, cacheOK := globals.DbMap[url]
-	globals.Lock.RUnlock()
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Op&fsnotify.Write != fsnotify.Write {
+				continue
+			}
 
+			config, err := models.ParseConfFile(filePath)
+			if err != nil {
+				log.Printf("reload config: %v", err)
+				continue
+			}
+
+			current := state.Config()
+			if config.Archives != current.Archives {
+				if err := archiveStore.Reload(config.Archives); err != nil {
+					log.Printf("reload archive store: %v", err)
+					continue
+				}
+			}
+
+			state.ReplaceConfig(config)
+			log.Println("configuration reloaded")
+
+			formattedTime := time.Now().Format("2006-01-02 15:04:05")
+			for _, url := range config.Values {
+				go UpdateFeed(state, archiveStore, url, formattedTime)
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Printf("config watcher error: %v", err)
+		}
+	}
+}
+
+func Check(state *appstate.State, archiveStore *archive.Store, url string, result *gofeed.Feed, item *gofeed.Item) {
+	if result == nil || item == nil || len(result.Items) == 0 {
+		return
+	}
+
+	cache, cacheOK := state.Feed(url)
 	if cacheOK && len(cache.Items) > 0 && cache.Items[0].Link == result.Items[0].Link {
 		return
 	}
 
-	link := normalizeLink(v.Link)
-
-	globals.Lock.RLock()
-	_, fileCacheOK := globals.Hash[link]
-	globals.Lock.RUnlock()
-	if fileCacheOK {
+	link := normalizeLink(item.Link)
+	if archiveStore.Contains(link) {
 		return
 	}
 
-	// 匹配关键词
-	MatchStr(v.Title, func(msg string) {
-		globals.Lock.Lock()
-		if _, exists := globals.Hash[link]; exists {
-			globals.Lock.Unlock()
+	config := state.Config()
+	MatchStr(item.Title, config.Keywords, func(msg string) {
+		isNew, err := archiveStore.MarkIfNew(link)
+		if err != nil {
+			log.Printf("record archive link: %v", err)
 			return
 		}
-		globals.Hash[link] = 1
-		globals.Lock.Unlock()
+		if !isNew {
+			return
+		}
 
-		// 发送通知
-		go Notify(Message{
+		go Notify(config.Notify, Message{
 			Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
-			Content:  fmt.Sprintf("%s\n%s", msg, v.Link),
-			FeedItem: *v,
+			Content:  fmt.Sprintf("%s\n%s", msg, item.Link),
+			FeedItem: *item,
 		})
-		globals.WriteFile(globals.RssUrls.Archives, link)
 	})
 }
 
