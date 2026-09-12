@@ -1,512 +1,79 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><< .WebTitle >></title>
-  <meta name="description" content='<< .WebDes >>'>
-  <meta name="keywords" content="<< .Keywords >>">
-  <meta name="anthor" content="srcrs">
-  <!-- <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css"> -->
-  <link rel="stylesheet" href="static/index.min.css">
-  <link rel="icon" href="static/favicon.svg" type="image/x-icon">
-  <style>
-    html {
-      min-height: 100%;
-    }
-
-    :root {
-      --color-0: linear-gradient(to bottom, #ff4500, #f03000);
-      --color-1: linear-gradient(to bottom, #404040, #1a1a1a);
-      --color-2: linear-gradient(to bottom, #007f80, #007070);
-      --color-3: linear-gradient(to bottom, #393092, #30287b);
-      --color-4: linear-gradient(to bottom, #00aeef, #009dd6);
-      --color-5: linear-gradient(to bottom, #87179d, #6e1381);
-    }
-
-    body {
-      font-family: 微软雅黑, "Avenir", Helvetica, Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      text-align: center;
-      color: #2c3e50;
-      margin-top: 30px;
-      background: #f7f7f7;
-      background: linear-gradient(135deg, rgba(247, 149, 51, .1), rgba(243, 112, 85, .1) 15%, rgba(239, 78, 123, .1) 30%, rgba(161, 102, 171, .1) 44%, rgba(80, 115, 184, .1) 58%, rgba(16, 152, 173, .1) 72%, rgba(7, 179, 155, .1) 86%, rgba(109, 186, 130, .1));
-    }
-
-    #app {
-      max-width: 1600px;
-      margin: 0 auto;
-    }
-
-    .el-scrollbar:hover:after {
-      opacity: 1;
-    }
-
-    .el-scrollbar:after {
-      content: "";
-      position: absolute;
-      height: 18px;
-      pointer-events: none;
-      display: block;
-      width: 100%;
-      bottom: 0;
-      opacity: 0;
-      background: linear-gradient(to top, rgba(0, 0, 0, 0.1), transparent);
-      transition: opacity 0.2s ease;
-      border-radius: 0 0 6px 6px;
-    }
-
-    .card-header {
-      font-size: 18px;
-      font-weight: bold;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      text-align: left;
-      margin-bottom: 10px;
-      color: white;
-      height: 2.4em;
-      border-radius: 6px;
-      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 2px -1px rgba(0, 0, 0, 0.2);
-      padding: 4px 0.5em 0;
-      position: relative;
-    }
-
-    #app > section > main > div > div:nth-child(6n+1) > div > div > div.card-header {
-      background: var(--color-0);
-    }
-
-    #app > section > main > div > div:nth-child(6n+2) > div > div > div.card-header {
-      background: var(--color-1);
-    }
-
-    #app > section > main > div > div:nth-child(6n+3) > div > div > div.card-header {
-      background: var(--color-2);
-    }
-
-    #app > section > main > div > div:nth-child(6n+4) > div > div > div.card-header {
-      background: var(--color-3);
-    }
-
-    #app > section > main > div > div:nth-child(6n+5) > div > div > div.card-header {
-      background: var(--color-4);
-    }
-
-    #app > section > main > div > div:nth-child(6n) > div > div > div.card-header {
-      background: var(--color-5);
-    }
-
-    .card-header > time {
-      display: block;
-      position: absolute;
-      font-size: 10px;
-      top: 28px;
-      color: #dfdfdf;
-    }
-
-    .list-item {
-      display: flex;
-      align-items: center;
-      text-align: left;
-      width: 100%;
-    }
-
-    .list-item-title {
-      display: block;
-      overflow: hidden;
-      text-align: left;
-      margin-bottom: 8px;
-      cursor: pointer;
-      color: #0060a0;
-      text-decoration: none;
-      padding: 0 0.5em;
-      position: relative;
-    }
-
-    .list-item-title::before {
-      content: "· ";
-      position: absolute;
-      margin-left: -1rem rem;
-      color: #0060a0;
-      cursor: pointer;
-    }
-
-    .title-link {
-      display: block;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align: left;
-    }
-
-    a {
-      color: black;
-      text-decoration: none;
-    }
-
-    .feed-col {
-      margin-bottom: 20px;
-    }
-
-    .el-card.is-always-shadow {
-      box-shadow: none;
-    }
-
-    .el-card {
-      border: none;
-      background: none;
-    }
-
-    .el-link__inner {
-      display: inline;
-      color: #0060a0;
-      padding-left: .6em;
-    }
-
-    * {
-      transition: .2s ease-out;
-    }
-
-    *:hover {
-      text-decoration: none;
-    }
-
-    .el-card__body {
-      padding: 0;
-    }
-
-    .el-link:hover {
-      transform: translateX(4px);
-      color: #b03000
-    }
-
-    .el-link.is-underline:hover:after {
-      border: none;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      body {
-        font-family: 微软雅黑, "Avenir", Helvetica, Arial, sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        text-align: center;
-        color: #2c3e50;
-        margin-top: 30px;
-        background: rgb(20, 29, 43);
-      }
-
-      #app {
-        max-width: 1600px;
-        margin: 0 auto;
-      }
-
-      .el-header {
-        color: rgb(159, 239, 0);
-      }
-
-      .el-scrollbar:hover:after {
-        opacity: 1;
-      }
-
-      .el-scrollbar:after {
-        content: "";
-        position: absolute;
-        height: 18px;
-        pointer-events: none;
-        display: block;
-        width: 100%;
-        bottom: 0;
-        opacity: 0;
-        background: linear-gradient(to top, rgba(0, 0, 0, 0.1), transparent);
-        transition: opacity 0.2s ease;
-        border-radius: 0 0 6px 6px;
-      }
-
-      .card-header {
-        font-size: 18px;
-        font-weight: bold;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        text-align: left;
-        margin-bottom: 10px;
-        color: rgb(159, 239, 0);
-        line-height: 2.4em;
-        padding: 0 0.8em 0.4em;
-        position: relative;
-      }
-
-      .card-header > time {
-        display: block;
-        position: absolute;
-        font-size: 10px;
-        top: 20px;
-        color: #768961;
-      }
-
-      .list-item {
-        display: flex;
-        align-items: center;
-        text-align: left;
-        width: 100%;
-      }
-
-      .list-item-title {
-        display: block;
-        overflow: hidden;
-        text-align: left;
-        margin-bottom: 8px;
-        cursor: pointer;
-        color: #0060a0;
-        text-decoration: none;
-        padding: 0 0.5em;
-        position: relative;
-      }
-
-      #app > section > main > div > div:nth-child(6n+1) > div > div > div.card-header {
-        background: none;
-      }
-
-      #app > section > main > div > div:nth-child(6n+2) > div > div > div.card-header {
-        background: none;
-      }
-
-      #app > section > main > div > div:nth-child(6n+3) > div > div > div.card-header {
-        background: none;
-      }
-
-      #app > section > main > div > div:nth-child(6n+4) > div > div > div.card-header {
-        background: none;
-      }
-
-      #app > section > main > div > div:nth-child(6n+5) > div > div > div.card-header {
-        background: none;
-      }
-
-      #app > section > main > div > div:nth-child(6n) > div > div > div.card-header {
-        background: none;
-      }
-
-      .list-item-title::before {
-        content: "►";
-        position: absolute;
-        margin-left: -1rem rem;
-        color: rgb(159, 239, 0);
-        cursor: pointer;
-      }
-
-      .title-link {
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        text-align: left;
-      }
-
-      a {
-        color: black;
-        text-decoration: none;
-      }
-
-      .feed-col {
-        margin-bottom: 20px;
-      }
-
-      .el-card.is-always-shadow {
-        box-shadow: rgb(15, 22, 32) 4px 4px 0px;
-      }
-
-      .el-card {
-        border: none;
-        background: rgb(26, 35, 50);
-        border-radius: 8px;
-      }
-
-      .el-link__inner {
-        display: inline;
-        color: #c3c3c3;
-        text-align: justify;
-        padding-left: 1.4em;
-      }
-
-      .el-link {
-        transition: .2s ease-out;
-      }
-
-      *:hover {
-        text-decoration: none;
-      }
-
-      .el-card__body {
-        padding: 0;
-      }
-
-      .el-link:hover {
-        transform: translateX(4px);
-        color: #b03000
-      }
-
-      .el-link.is-underline:hover:after {
-        border: none;
-      }
-    }
-
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="<<.Snapshot.Description>>">
+  <meta name="author" content="huhengbo">
+  <title><<.Snapshot.Title>></title>
+  <script src="/static/preferences.js"></script>
+  <link rel="stylesheet" href="/static/themes.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script type="module" src="/static/app.js"></script>
 </head>
-
 <body>
-  <div id="app">
-    <el-container>
-      <el-header>
-        <h1>
-          << .WebTitle >>
-        </h1>
-      </el-header>
-      <el-main v-loading.fullscreen.lock="fullscreenLoading" element-loading-text="拼命加载中">
-        <el-row :gutter="20">
-          << range $index, $feed :=.RssDataList >>
-            <el-col v-if="showSEOFlag" :xs="24" :sm="12" :md="8" :lg="6" :key="index" class="feed-col">
-              <el-card class="box-card">
-                <div slot="header" class="card-header">
-                  <span>
-                    << $feed.Title >>
-                  </span>
-                  <time class="time">
-                    << $feed.Custom.lastupdate >>
-                  </time>
-                </div>
-                <el-scrollbar style="height: 300px;">
-                  << range $i, $item :=$feed.Items >>
-                    <el-list key="<< $i >>">
-                      <el-list-item>
-                        <div class="list-item-title">
-                          <span>
-                            << inc $i >>.
-                          </span>
-                          <el-link href="<< $item.Link >>" target="_blank" title="<< $item.Title >>">
-                            << $item.Title >>
-                          </el-link>
-                        </div>
-                      </el-list-item>
-                    </el-list>
-                    << end >>
-                </el-scrollbar>
-              </el-card>
-            </el-col>
-            << end>>
-              <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="(feed, index) in feeds" :key="index" class="feed-col">
-                <el-card class="box-card">
-                  <div slot="header" class="card-header">
-                    <span>{{ feed.title }}</span>
-                    <time class="time">{{ feed.custom.lastupdate }}</time>
-                  </div>
-                  <el-scrollbar style="height: << .ListHeight >>px;">
-                    <el-list v-for="(item, i) in feed.items" :key="i">
-                      <el-list-item>
-                        <div class="list-item-title">
-<!--                          <span>{{ i+1 }}. </span>-->
-                          <el-link :href="item.link" target="_blank" :title="item.title">{{ item.title }}</el-link>
-                        </div>
-                      </el-list-item>
-                    </el-list>
-                  </el-scrollbar>
-                </el-card>
-              </el-col>
-        </el-row>
-      </el-main>
-      <el-footer>
-        <el-link href="https://github.com/huhengbo/rss-reader" target="_blank">Rss-reader</el-link>
-        <span> | </span>
-        <el-link href="https://github.com/huhengbo" target="_blank">fork from srcrs</el-link>
-      </el-footer>
-    </el-container>
+  <a class="skip" href="#main">跳到订阅内容</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="RSS Reader 首页"><span class="brand-mark" aria-hidden="true">R</span><span>RSS Reader<small>轻量 · 自托管</small></span></a>
+      <nav class="enhanced-only" aria-label="订阅源">
+        <p class="nav-caption">我的订阅</p>
+        <div id="source-nav"></div>
+      </nav>
+      <p class="sidebar-note">信息有序，阅读从容。<br>订阅内容来自你配置的来源。</p>
+    </aside>
+    <main id="main" tabindex="-1" style="--list-height: <<.Snapshot.ListHeight>>px">
+      <header class="page-header">
+        <div><p class="eyebrow">YOUR DAILY READING</p><h1 id="page-title"><<.Snapshot.Title>></h1><p class="page-description" id="page-description"><<.Snapshot.Description>></p></div>
+        <div class="stats"><strong id="source-count"><<len .Snapshot.Sources>></strong><span>订阅源</span></div>
+      </header>
+      <section class="appearance enhanced-only" aria-label="阅读外观">
+        <label>皮肤<select id="skin"><option value="slate">Slate · 简洁工作台</option><option value="paper">Paper · 纸感阅读</option><option value="grove">Grove · 柔和自然</option><option value="terminal">Terminal · 终端风格</option></select></label>
+        <label>明暗<select id="mode"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+        <label>密度<select id="density"><option value="comfortable">舒适</option><option value="compact">紧凑</option></select></label>
+      </section>
+      <div class="toolbar enhanced-only" role="search" aria-label="筛选订阅内容">
+        <label class="search-wrap"><span class="sr-only">搜索文章或订阅源</span><input id="search" type="search" placeholder="搜索文章或订阅源" autocomplete="off" maxlength="500"></label>
+        <button id="clear-search" type="button">清空</button>
+        <label class="filter-label"><span class="sr-only">筛选订阅源</span><select id="source-filter"><option value="">全部订阅源</option></select></label>
+        <button id="refresh-view" type="button" title="读取服务器的最新缓存，不触发外部 RSS 抓取">刷新视图</button>
+      </div>
+      <div class="status-row enhanced-only">
+        <p id="connection" role="status" aria-live="polite">正在连接…</p>
+        <p id="result-count" role="status" aria-live="polite"></p>
+      </div>
+      <div id="updates" class="notice enhanced-only" hidden><p id="update-text" role="status" aria-live="polite"></p><button id="apply-updates" type="button">应用更新</button></div>
+      <p id="page-error" class="notice warning" role="status" hidden></p>
+      <section aria-label="订阅内容">
+        <div id="sources" class="feed-grid"><<range .Snapshot.Sources>><<template "source" .>><<end>></div>
+        <div id="empty-state" class="empty-state" <<if .Snapshot.Sources>>hidden<<end>>><h2 id="empty-title">还没有订阅源</h2><p id="empty-description">请在配置文件的 values 中添加订阅源。</p></div>
+      </section>
+      <noscript><p class="notice">JavaScript 未启用，当前为静态阅读模式。重新打开页面可获取最新缓存。</p></noscript>
+      <footer class="page-footer"><span>RSS Reader · 信息由订阅源提供</span><span>基于 <a href="https://github.com/srcrs/rss-reader" target="_blank" rel="noopener noreferrer">srcrs/rss-reader</a> · <a href="https://github.com/huhengbo/rss-reader" target="_blank" rel="noopener noreferrer">huhengbo 维护</a></span></footer>
+    </main>
   </div>
-
-  <!-- <script src="https://unpkg.com/vue@next"></script> -->
-  <script src="static/vue.global.prod.js"></script>
-
-  <!-- <script src="https://cdn.bootcdn.net/ajax/libs/element-plus/2.3.3/index.full.js"></script> -->
-  <script src="static/index.full.min.js"></script>
-  <script>
-    const app = Vue.createApp({
-      data() {
-        return {
-          feeds: [],
-          showSEOFlag: true,
-          fullscreenLoading: true,
-          countdown: 60,
-          isPc: true,
-          autoUpdatePush: << .AutoUpdatePush >>,
-          listHeight: << .ListHeight >>,
-          webTitle: << .WebTitle >>,
-          webDes: << .WebDes >>,
-        };
-      },
-      async created() {
-        this.fullscreenLoading = false;
-        // 使用媒体查询判断设备类型
-        this.isPc = !window.matchMedia('(max-width: 767px)').matches;
-      },
-      async mounted() {
-        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        const connect = () => {
-          const socket = new WebSocket(protocol + window.location.host + "/ws");
-          socket.onmessage = event => {
-            const feed = JSON.parse(event.data);
-            const existingFeed = this.feeds.find(f => f.link === feed.link);
-            if (existingFeed) {
-              Object.assign(existingFeed, feed);
-            } else {
-              this.feeds.push(feed);
-            }
-            this.showSEOFlag = false;
-          };
-          const reloadHtml = () => {
-            if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
-              if (document.visibilityState === 'visible') {
-                // 刷新网页
-                console.log("reload...")
-                location.reload();
-              }
-            }
-          }
-          socket.onclose = event => {
-            if (this.isPc && this.autoUpdatePush > 0) {
-              console.log("WebSocket closed. Reconnecting...");
-              setInterval(reloadHtml, 3000);
-            }
-          };
-          // Send heartbeat message every 60 seconds
-          const sendHeartbeat = () => {
-            if (socket.readyState === WebSocket.OPEN) {
-              socket.send("heartbeat");
-            } else if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
-              reloadHtml()
-            }
-          };
-          if (this.isPc && this.autoUpdatePush > 0) {
-            setInterval(sendHeartbeat, 60000);
-            setInterval(() => {
-              if (this.countdown > 0) {
-                this.countdown--;
-              } else {
-                this.countdown = 60;
-              }
-            }, 1000);
-          }
-        };
-        connect();
-      },
-      beforeDestroy() {
-        // 在组件销毁前手动关闭 WebSocket 连接
-        this.socket.close();
-      }
-    });
-
-    app.use(ElementPlus);
-    app.mount("#app");
-  </script>
+  <template id="source-template"><<template "source" .BlankSource>></template>
+  <template id="item-template"><<template "item" .BlankItem>></template>
+  <script id="initial-data" type="application/json"><<.Snapshot>></script>
 </body>
 </html>
+<<define "source">>
+<article class="feed-card" data-id="<<.ID>>" aria-labelledby="heading-<<.ID>>">
+  <header class="card-header">
+    <span class="feed-avatar" aria-hidden="true">RSS</span>
+    <div class="card-heading"><h2 id="heading-<<.ID>>" data-part="title"><<.Title>></h2><span class="source-state" data-status="<<.Status>>"><<statusText .Status>></span></div>
+    <button class="collapse enhanced-only" data-action="collapse" type="button" aria-label="折叠 <<.Title>>" aria-expanded="true" aria-controls="body-<<.ID>>">−</button>
+  </header>
+  <div class="card-body" id="body-<<.ID>>">
+    <p class="source-message" <<if not .Message>>hidden<<end>>><<.Message>></p>
+    <div class="skeleton" <<if ne .Status "loading">>hidden<<end>> aria-hidden="true"><i></i><i></i><i></i></div>
+    <ul class="article-list" role="list"><<range .Items>><<template "item" .>><<end>></ul>
+    <button class="more enhanced-only" data-action="more" type="button" <<if le (len .Items) 8>>hidden<<end>>>展开更多</button>
+    <p class="empty-source" <<if .Items>>hidden<<end>>>当前没有可展示的文章</p>
+    <div class="card-footer"><span>最近成功同步 <time data-part="success" datetime="<<.LastSuccessAt>>"><<if .LastSuccessAt>><<.LastSuccessAt>><<else>>尚未成功<<end>></time></span><span>内容变更 <time data-part="changed" datetime="<<.ContentChangedAt>>"><<if .ContentChangedAt>><<.ContentChangedAt>><<else>>—<<end>></time></span></div>
+  </div>
+</article>
+<<end>>
+<<define "item">>
+<li data-item-id="<<.ID>>"><a class="article-link" <<if .Link>>href="<<.Link>>"<<end>> target="_blank" rel="noopener noreferrer"><span class="article-title"><<.Title>></span><time class="item-time" datetime="<<.PublishedAt>>" <<if not .PublishedAt>>hidden<<end>>><<.PublishedAt>></time></a></li>
+<<end>>
