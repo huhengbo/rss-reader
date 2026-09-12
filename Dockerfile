@@ -7,7 +7,7 @@ WORKDIR /src
 #RUN go env -w GO111MODULE=on && \
 #    go env -w GOPROXY=https://goproxy.cn,direct
 
-RUN go build -ldflags "-s -w" -o ./bin/ .
+RUN go build -ldflags "-s -w" -o ./bin/rss-reader ./cmd/rss-reader
 
 FROM alpine
 
