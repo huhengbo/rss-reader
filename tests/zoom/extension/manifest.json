@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "RSS Reader local zoom test",
+  "version": "1.0.0",
+  "description": "Test-only native tab zoom in a disposable Playwright profile.",
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" }
+}

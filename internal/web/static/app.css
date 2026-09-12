@@ -73,7 +73,8 @@ h1 { font-size: clamp(24px, 2.5vw, 34px); font-weight: var(--heading-weight); li
 .article-link:focus-visible { outline-offset: -2px; }
 .article-title { display: block; overflow-wrap: anywhere; line-height: var(--line-height); }
 .item-time { display: block; color: var(--muted); font: 12px/1.6 var(--meta-font); margin-top: 5px; }
-.js:not(.hydrated) .article-list li:nth-child(n+9) { display: none; }
+/* Only app.js may fold articles once the expand controls can be initialized.
+   A failed module download must leave the complete server-rendered list readable. */
 .more { width: calc(100% - 2 * var(--card-padding)); margin: 8px var(--card-padding) 14px; justify-content: center; font-size: 12px; }
 .card-footer { background: var(--subtle); border-top: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); padding: 10px var(--card-padding); display: grid; gap: 3px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .source-message { color: var(--warning); background: var(--warning-soft); border-radius: var(--small-radius); padding: 10px; margin: 12px var(--card-padding); font-size: 12px; }
