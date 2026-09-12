@@ -1,41 +1,39 @@
 # RSS Reader
 
 [![CI](https://github.com/huhengbo/rss-reader/actions/workflows/ci.yml/badge.svg)](https://github.com/huhengbo/rss-reader/actions/workflows/ci.yml)
+[![UI](https://github.com/huhengbo/rss-reader/actions/workflows/ui.yml/badge.svg)](https://github.com/huhengbo/rss-reader/actions/workflows/ui.yml)
 [![Release](https://github.com/huhengbo/rss-reader/actions/workflows/release.yml/badge.svg)](https://github.com/huhengbo/rss-reader/actions/workflows/release.yml)
 [![License](https://img.shields.io/github/license/huhengbo/rss-reader)](LICENSE)
 
-一个轻量的自托管 RSS 聚合页面，支持关键词匹配、WebSocket 自动刷新，以及飞书、Telegram、钉钉通知。
+轻量的自托管 RSS 聚合页面，支持关键词通知、可靠的实时更新，以及四套独立于明暗模式的阅读皮肤。
 
-本仓库基于 `srcrs/rss-reader` 的后续 fork 演进而来，目前已经形成独立的工程结构和维护策略。上游关系与同步原则见 [维护策略](docs/maintenance.md)。
+本仓库基于 `srcrs/rss-reader` 的后续 fork 演进，维护独立的工程结构与测试。来源关系与同步原则见 [维护策略](docs/maintenance.md)。
+
+> 本 README 描述当前源码。UI 改造没有自动发版；已发布的 `v1.0.0` 镜像不含本轮新界面。需要新界面时使用当前源码构建，正式镜像版本以 Release 为准。
 
 ## 功能
 
-- 聚合多个 RSS / Atom / JSON Feed 订阅源
-- 响应式 Web 页面与系统深色模式
-- WebSocket 推送页面更新
-- 关键词包含 / 排除匹配
-- 飞书、Telegram、钉钉通知
-- 配置文件热更新
-- 通知链接持久化去重
-- `/healthz` 健康检查
-- HTTP / WebSocket 超时与优雅退出
-- Docker 非 root 运行
-- GitHub Actions：测试、race、漏洞扫描、跨平台编译、Docker 构建
-- Release 自动发布 `linux/amd64` 与 `linux/arm64` GHCR 镜像
+- 聚合 RSS / Atom / JSON Feed，飞书、Telegram、钉钉关键词通知。
+- 完整有序快照、同站多源独立、加载 / 空源 / 失败 / 陈旧状态。
+- 桌面与移动端均可无整页刷新地恢复连接，新文章先提示再应用。
+- 本地标题搜索、源筛选、折叠、展开更多与舒适 / 紧凑密度。
+- Slate / Paper / Grove / Terminal 四套皮肤，均支持浅色、深色、跟随系统。
+- 中文语义化页面、键盘焦点、减少动态效果；无 JavaScript 时保留静态阅读。
+- 配置热更新、通知链接持久化去重、`/healthz` 与优雅退出。
+- Go embed 单二进制，无运行时前端框架、CDN、外部字体或 Node 依赖。
+- Go / race / 漏洞扫描、三系统编译、三浏览器交互测试、Docker 构建。
+- Release 发布 `linux/amd64` 与 `linux/arm64` 的非 root GHCR 镜像。
 
-## 预览
+## 阅读皮肤
 
-### 桌面端
+| 名称 | 风格 |
+| --- | --- |
+| **Slate**（默认） | 冷灰底、靛蓝强调、细边框，适合工作台式扫读 |
+| **Paper** | 暖纸色、衬线标题、印刷版式分隔线 |
+| **Grove** | 雾绿底、自然绿强调、柔和圆角与舒展间距 |
+| **Terminal** | 等宽排版、低饱和绿、方角，无持续闪烁或辉光 |
 
-![Desktop](pc.png)
-
-### 深色模式
-
-![Dark mode](pc_night.png)
-
-### 移动端
-
-![Mobile](mobile.png)
+四套皮肤共用组件与业务逻辑，不维护四份页面。皮肤、明暗、密度独立选择；偏好存储不可用时仍可正常阅读。截图检查、皮肤扩展、交互与协议说明见 [阅读界面维护文档](docs/ui.md)。
 
 ## 快速开始
 
@@ -49,85 +47,56 @@ cd rss-reader
 cp config.example.json config.json
 ```
 
-编辑 `config.json` 后启动：
+Windows PowerShell 的复制命令为 `Copy-Item config.example.json config.json`。编辑实际订阅配置后启动：
 
-```bash
+```text
 docker compose up -d
 ```
 
-默认映射到宿主机 `9898` 端口：
+默认访问 `http://localhost:9898`。Compose 使用 `ghcr.io/huhengbo/rss-reader:latest`；这对应已发布镜像，不是每次 main 提交都会更新。
+
+生产部署推荐固定版本，在 Compose 同目录 `.env` 中指定（macOS / Windows / Linux 通用）：
+
+```dotenv
+RSS_READER_IMAGE=ghcr.io/huhengbo/rss-reader:1.0.0
+```
+
+从当前源码构建包含新界面的镜像：
 
 ```text
-http://localhost:9898
-```
-
-Compose 默认使用：
-
-```text
-ghcr.io/huhengbo/rss-reader:latest
-```
-
-也可以指定固定版本，生产部署推荐使用版本标签而不是长期依赖 `latest`：
-
-```bash
-RSS_READER_IMAGE=ghcr.io/huhengbo/rss-reader:1.0.0 docker compose up -d
-```
-
-从源码构建本地镜像：
-
-```bash
 docker build -t rss-reader:local .
-RSS_READER_IMAGE=rss-reader:local docker compose up -d
 ```
 
-### 本地 Go 运行
+将 `.env` 的 `RSS_READER_IMAGE` 改为 `rss-reader:local`，再执行 `docker compose up -d`。不要用空示例覆盖已有真实配置。
 
-要求 Go 1.27.x。
+### 本地 Go
 
-```bash
-cp config.example.json config.json
+要求 Go 1.27.x，不需要安装 Node 或执行 npm build。
+
+```text
 go run ./cmd/rss-reader
 ```
 
-默认访问：
-
-```text
-http://localhost:8080
-```
+运行前从 `config.example.json` 创建并编辑 `config.json`。默认访问 `http://localhost:8080`。
 
 ## 配置
 
-仓库只提交安全的 `config.example.json`。真实 `config.json`、运行时 `archives.txt` 和本地配置文件不会进入 Git。
-
-基础配置示例：
+仓库只提交安全示例。真实配置、运行时归档与本地凭据不要提交到 Git。
 
 ```json
 {
   "port": 8080,
-  "values": [
-    "https://example.com/feed.xml"
-  ],
+  "values": ["https://example.com/feed.xml"],
   "refresh": 5,
   "autoUpdatePush": 0,
   "listHeight": 600,
   "webTitle": "RSS Reader",
   "webDes": "My RSS dashboard",
-  "keywords": [
-    "example -ignore"
-  ],
+  "keywords": ["example -ignore"],
   "notify": {
-    "feishu": {
-      "api": ""
-    },
-    "dingtalk": {
-      "webhook": "",
-      "sign": ""
-    },
-    "telegram": {
-      "api": "https://api.telegram.org/bot${token}/sendMessage",
-      "chat_id": "",
-      "token": ""
-    }
+    "feishu": {"api": ""},
+    "dingtalk": {"webhook": "", "sign": ""},
+    "telegram": {"api": "https://api.telegram.org/bot${token}/sendMessage", "chat_id": "", "token": ""}
   },
   "archives": "archives.txt"
 }
@@ -135,129 +104,118 @@ http://localhost:8080
 
 | 字段 | 说明 | 默认值 |
 | --- | --- | --- |
-| `port` | HTTP 监听端口 | `8080` |
+| `port` | HTTP 端口；变更需要重启 | `8080` |
 | `values` | RSS / Atom / JSON Feed 地址列表 | 空 |
-| `refresh` | 后端拉取订阅源的间隔，单位分钟 | `5` |
-| `autoUpdatePush` | WebSocket 页面推送间隔，`0` 表示只推送连接时的当前数据 | `0` |
-| `listHeight` | 页面 Feed 列表高度 | `600` |
-| `webTitle` | 页面标题 | 空 |
+| `refresh` | 后台外部抓取间隔，单位分钟 | `5` |
+| `autoUpdatePush` | 新页面：`0` 为单次快照；正值开启实时更新。旧 `/ws` 仍按该值的分钟周期发送 | `0` |
+| `listHeight` | 桌面文章列表最大高度；移动端使用文档滚动 | `600` |
+| `webTitle` | 页面标题；空值时界面使用 RSS Reader | 空 |
 | `webDes` | 页面描述 | 空 |
 | `keywords` | 通知关键词规则 | 空 |
 | `notify` | 通知渠道配置 | 空 |
-| `archives` | 已通知链接的去重文件 | `archives.txt` |
+| `archives` | 已通知链接去重文件 | `archives.txt` |
+
+新协议 `/ws?v=1` 在实时模式下每秒检查缓存 revision，有变化才发送完整快照；**不增加外部 RSS 抓取频率**。`autoUpdatePush=0` 时点击“刷新视图”只读取缓存。连接正常不代表所有源抓取成功，源状态和最后成功同步时间单独显示。
 
 ### 关键词规则
 
-每个 `keywords` 元素是一组规则。普通词表示“包含任一正向词即可匹配”，以 `-` 开头的词表示排除条件；匹配不区分大小写。
-
-例如：
+每个 keywords 元素是一组规则。普通词表示“包含任一正向词”，以 `-` 开头表示排除，不区分大小写：
 
 ```json
-{
-  "keywords": [
-    "抽奖 -测评",
-    "cloudcone racknerd -expired"
-  ]
-}
+{"keywords": ["抽奖 -测评", "cloudcone racknerd -expired"]}
 ```
 
-`"抽奖 -测评"` 表示标题包含“抽奖”且不包含“测评”时匹配。
+例如 `"抽奖 -测评"` 匹配包含“抽奖”但不包含“测评”的标题。页面搜索独立于通知规则，不改变通知行为。
 
-## 敏感配置与环境变量
+## 敏感配置
 
-生产环境建议通过环境变量注入通知凭据，不要把 token / webhook / 私有订阅地址写入仓库。
+建议通过环境变量注入通知凭据；私有订阅地址仍由运行时配置管理，不放入示例或公开 Issue。
 
 | 环境变量 | 作用 |
 | --- | --- |
-| `RSS_READER_CONFIG` | 配置文件路径 |
+| `RSS_READER_CONFIG` | 配置路径 |
 | `RSS_READER_PORT` | HTTP 端口覆盖 |
-| `RSS_READER_ARCHIVES` | archive 文件路径覆盖 |
+| `RSS_READER_ARCHIVES` | 归档文件路径覆盖 |
 | `RSS_READER_FEISHU_API` | 飞书 webhook |
 | `RSS_READER_DINGTALK_WEBHOOK` | 钉钉 webhook |
 | `RSS_READER_DINGTALK_SIGN` | 钉钉签名 secret |
 | `RSS_READER_TELEGRAM_API` | Telegram API 模板 |
 | `RSS_READER_TELEGRAM_CHAT_ID` | Telegram chat id |
-| `RSS_READER_TELEGRAM_TOKEN` | Telegram bot token |
+| `RSS_READER_TELEGRAM_TOKEN` | Telegram token |
 
-Telegram 的 `token` 与 `chat_id` 必须同时配置。
-
-更多安全说明见 [SECURITY.md](SECURITY.md)。
+Telegram token 与 chat_id 必须同时配置。新快照不返回原始配置 URL，但阅读内容本身可能是私有的；页面没有用户登录系统，公网部署必须在反向代理增加访问控制。详见 [SECURITY.md](SECURITY.md)。
 
 ## 项目结构
 
 ```text
-.
-├── cmd/
-│   └── rss-reader/          # 可执行入口与依赖组装
-├── internal/
-│   ├── archive/             # 通知去重持久化
-│   ├── config/              # 配置加载、默认值、校验
-│   ├── domain/              # Feed 领域模型
-│   ├── feed/                # RSS 拉取、匹配、配置监听
-│   ├── notify/              # 飞书 / Telegram / 钉钉
-│   ├── server/              # HTTP / WebSocket handler
-│   ├── state/               # 线程安全运行时状态
-│   └── web/                 # 嵌入式前端资源
-├── .github/
-│   ├── workflows/ci.yml     # 质量门禁
-│   └── workflows/release.yml
-├── config.example.json
-├── docker-compose.yml
-└── Dockerfile
+cmd/rss-reader/                  应用入口与依赖组装
+internal/
+  archive/                      通知去重持久化
+  config/                       加载、默认值与校验
+  domain/                       Feed 与版本化快照
+  feed/                         拉取、匹配与配置监听
+  notify/                       通知渠道
+  server/                       HTTP / WebSocket 与共享模板
+    testdata/ui/                仅用于 UI 测试的本地数据服务
+  state/                        线程安全状态、源身份、抓取状态
+  web/static/                   原生 HTML / JS / CSS，直接 embed
+tests/ui/                       Node 纯逻辑与生命周期回归
+tests/browser/                  Playwright 真实浏览器回归
+scripts/check-assets.js          运行时资源预算检查
+.github/workflows/
+  ci.yml                        Go、跨系统编译、Docker
+  ui.yml                        Chromium / Firefox / WebKit
+  release.yml                   多架构镜像发布
+docs/                           维护、UI 与协议文档
 ```
 
-核心原则是显式依赖、单向职责边界，避免 package-level mutable globals 和新的“万能 utils 包”。
+避免全局可变状态、万能 utils 包和没有实际用途的抽象。前端模块按职责分离，但不引入运行时构建链。
 
 ## 开发与验证
 
-提交前至少运行：
+Go 检查：
 
-```bash
+```text
 go mod tidy
-gofmt -w .
+gofmt -w cmd internal
 go vet ./...
 go test ./...
 go test -race ./...
 go build ./...
+go install golang.org/x/vuln/cmd/govulncheck@latest
 govulncheck ./...
 ```
 
-CI 会验证：
+UI 开发者另需 Node.js 22+（CI 使用 24）：
 
-- `go mod verify` / `go mod tidy`
-- `gofmt`
-- `go vet`
-- 单元 / 回归测试
-- race detector
-- `govulncheck`
-- Linux、macOS、Windows 编译
-- Docker image build
+```text
+npm ci --ignore-scripts
+npm test
+npm run check:assets
+npx playwright install chromium firefox webkit
+npm run test:e2e
+```
 
-贡献规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+测试自动启动 localhost 固定数据服务，不调用真实 RSS 或通知。Linux 可能需要 `npx playwright install --with-deps chromium firefox webkit`。只测 Chromium 可用 `npm run test:e2e -- --project=chromium`。
 
-## 健康检查
+CI 保留浏览器报告、截图与失败 trace；资源检查区分原始和 gzip 大小，不能把压缩测量当作实际传输量。人工屏幕阅读器和浏览器 200% 缩放验收仍单独跟踪，自动测试不是完整可访问性认证。
 
-```bash
+详见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [docs/ui.md](docs/ui.md)。
+
+## 健康检查与反向代理
+
+```text
 curl http://localhost:8080/healthz
 ```
 
-正常返回：
+返回 `ok`，镜像内置同一健康检查。它表示 HTTP 服务存活，不表示全部订阅源可用。
 
-```text
-ok
-```
-
-Docker 镜像已内置该健康检查。
-
-## Nginx 反向代理
-
-WebSocket 路径为 `/ws`：
+Nginx 示例（证书与域名替换为实际值，并按需增加认证）：
 
 ```nginx
 server {
     listen 443 ssl;
     server_name rss.example.com;
-
     ssl_certificate     /path/to/fullchain.pem;
     ssl_certificate_key /path/to/privkey.pem;
 
@@ -267,7 +225,6 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-
     location /ws {
         proxy_pass http://127.0.0.1:9898/ws;
         proxy_http_version 1.1;
@@ -279,29 +236,13 @@ server {
 }
 ```
 
-WebSocket 默认执行同源 Origin 校验，因此反向代理需要保留正确的 `Host`。
+保留原始 Host 与 `/ws?v=1` 的查询参数。同源 Origin 校验默认开启。旧 `/feeds`、无版本 `/ws` 保留兼容，新增 `/api/v1/snapshot` 为完整快照接口。
 
-## 发布
+## 发布与维护
 
-版本使用 SemVer 标签：
+SemVer：`vMAJOR.MINOR.PATCH`。推送版本 tag 才触发 Release workflow，构建 amd64/arm64，发布 GHCR SemVer 标签与 latest，附带 provenance / SBOM，并创建 GitHub Release。
 
-```text
-vMAJOR.MINOR.PATCH
-```
-
-推送 `v*` Git tag 后，Release workflow 会：
-
-1. 构建 `linux/amd64` 和 `linux/arm64` 镜像；
-2. 推送到 `ghcr.io/huhengbo/rss-reader`；
-3. 生成 SemVer 镜像标签与 `latest`；
-4. 生成 provenance 和 SBOM；
-5. 创建对应 GitHub Release 并自动生成 release notes。
-
-## Upstream 与维护策略
-
-本仓库是长期维护的二次开发版本，不执行无审查的 upstream 整体 merge。安全修复和明确 bugfix 优先选择性移植，站点特例或改变现有语义的功能需单独评估。
-
-详细规则、当前 upstream 差异评估和依赖策略见 [docs/maintenance.md](docs/maintenance.md)。
+Go、GitHub Actions、npm 测试依赖由 Dependabot 分组更新，必须通过相应 CI。上游只选择性移植经审查的安全修复和通用 bugfix，不为消除 ahead/behind 数字整体覆盖本仓库。详见 [维护策略](docs/maintenance.md)。
 
 ## License
 
