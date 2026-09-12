@@ -1,4 +1,4 @@
-package utils
+package feed
 
 import (
 	"fmt"
@@ -10,19 +10,21 @@ import (
 	"github.com/mmcdole/gofeed"
 
 	"rss-reader/internal/archive"
+	"rss-reader/internal/config"
+	"rss-reader/internal/domain"
+	"rss-reader/internal/notify"
 	appstate "rss-reader/internal/state"
-	"rss-reader/models"
 )
 
 func UpdateFeeds(state *appstate.State, archiveStore *archive.Store) {
-	config := state.Config()
-	ticker := time.NewTicker(time.Duration(config.ReFresh) * time.Minute)
+	conf := state.Config()
+	ticker := time.NewTicker(time.Duration(conf.ReFresh) * time.Minute)
 	defer ticker.Stop()
 
 	for {
 		formattedTime := time.Now().Format("2006-01-02 15:04:05")
-		config = state.Config()
-		for _, url := range config.Values {
+		conf = state.Config()
+		for _, url := range conf.Values {
 			go UpdateFeed(state, archiveStore, url, formattedTime)
 		}
 		<-ticker.C
@@ -38,21 +40,18 @@ func UpdateFeed(state *appstate.State, archiveStore *archive.Store, url, formatt
 	}
 
 	cache, ok := state.Feed(url)
-	if ok &&
-		len(result.Items) > 0 &&
-		len(cache.Items) > 0 &&
-		result.Items[0].Link == cache.Items[0].Link {
+	if ok && len(result.Items) > 0 && len(cache.Items) > 0 && result.Items[0].Link == cache.Items[0].Link {
 		return
 	}
 
-	customFeed := models.Feed{
+	customFeed := domain.Feed{
 		Title:  result.Title,
 		Link:   result.Link,
 		Custom: map[string]string{"lastupdate": formattedTime},
-		Items:  make([]models.Item, 0, len(result.Items)),
+		Items:  make([]domain.Item, 0, len(result.Items)),
 	}
 	for _, item := range result.Items {
-		customFeed.Items = append(customFeed.Items, models.Item{
+		customFeed.Items = append(customFeed.Items, domain.Item{
 			Link:        item.Link,
 			Title:       item.Title,
 			Description: item.Description,
@@ -62,7 +61,7 @@ func UpdateFeed(state *appstate.State, archiveStore *archive.Store, url, formatt
 	state.SetFeed(url, customFeed)
 }
 
-func GetFeeds(state *appstate.State) []models.Feed {
+func GetFeeds(state *appstate.State) []domain.Feed {
 	return state.Feeds()
 }
 
@@ -89,25 +88,25 @@ func WatchConfigFileChanges(filePath string, state *appstate.State, archiveStore
 				continue
 			}
 
-			config, err := models.ParseConfFile(filePath)
+			conf, err := config.LoadFile(filePath)
 			if err != nil {
 				log.Printf("reload config: %v", err)
 				continue
 			}
 
 			current := state.Config()
-			if config.Archives != current.Archives {
-				if err := archiveStore.Reload(config.Archives); err != nil {
+			if conf.Archives != current.Archives {
+				if err := archiveStore.Reload(conf.Archives); err != nil {
 					log.Printf("reload archive store: %v", err)
 					continue
 				}
 			}
 
-			state.ReplaceConfig(config)
+			state.ReplaceConfig(conf)
 			log.Println("configuration reloaded")
 
 			formattedTime := time.Now().Format("2006-01-02 15:04:05")
-			for _, url := range config.Values {
+			for _, url := range conf.Values {
 				go UpdateFeed(state, archiveStore, url, formattedTime)
 			}
 		case err, ok := <-watcher.Errors:
@@ -134,8 +133,8 @@ func Check(state *appstate.State, archiveStore *archive.Store, url string, resul
 		return
 	}
 
-	config := state.Config()
-	MatchStr(item.Title, config.Keywords, func(msg string) {
+	conf := state.Config()
+	MatchTitle(item.Title, conf.Keywords, func(msg string) {
 		isNew, err := archiveStore.MarkIfNew(link)
 		if err != nil {
 			log.Printf("record archive link: %v", err)
@@ -145,8 +144,8 @@ func Check(state *appstate.State, archiveStore *archive.Store, url string, resul
 			return
 		}
 
-		go Notify(config.Notify, Message{
-			Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
+		go notify.Send(conf.Notify, notify.Message{
+			Routes:   []string{notify.FeiShuRoute, notify.TelegramRoute, notify.DingtalkRoute},
 			Content:  fmt.Sprintf("%s\n%s", msg, item.Link),
 			FeedItem: *item,
 		})

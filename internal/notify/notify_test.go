@@ -1,4 +1,4 @@
-package utils
+package notify
 
 import (
 	"net/http"
@@ -7,29 +7,29 @@ import (
 
 	"github.com/mmcdole/gofeed"
 
-	"rss-reader/models"
+	"rss-reader/internal/config"
 )
 
-func TestNotifyRoutesToConfiguredProviders(t *testing.T) {
+func TestSendRoutesToConfiguredProviders(t *testing.T) {
 	tests := []struct {
 		name         string
 		route        string
-		configure    func(baseURL string) models.Notify
+		configure    func(baseURL string) config.Notify
 		expectedPath string
 	}{
 		{
 			name:  "feishu",
 			route: FeiShuRoute,
-			configure: func(baseURL string) models.Notify {
-				return models.Notify{FeiShu: models.FeiShu{API: baseURL + "/feishu"}}
+			configure: func(baseURL string) config.Notify {
+				return config.Notify{FeiShu: config.FeiShu{API: baseURL + "/feishu"}}
 			},
 			expectedPath: "/feishu",
 		},
 		{
 			name:  "telegram",
 			route: TelegramRoute,
-			configure: func(baseURL string) models.Notify {
-				return models.Notify{Telegram: models.Telegram{
+			configure: func(baseURL string) config.Notify {
+				return config.Notify{Telegram: config.Telegram{
 					API:    baseURL + "/bot${token}/sendMessage",
 					ChatId: "chat-id",
 					Token:  "secret",
@@ -40,8 +40,8 @@ func TestNotifyRoutesToConfiguredProviders(t *testing.T) {
 		{
 			name:  "dingtalk",
 			route: DingtalkRoute,
-			configure: func(baseURL string) models.Notify {
-				return models.Notify{Dingtalk: models.Dingtalk{Webhook: baseURL + "/dingtalk"}}
+			configure: func(baseURL string) config.Notify {
+				return config.Notify{Dingtalk: config.Dingtalk{Webhook: baseURL + "/dingtalk"}}
 			},
 			expectedPath: "/dingtalk",
 		},
@@ -64,8 +64,7 @@ func TestNotifyRoutesToConfiguredProviders(t *testing.T) {
 			}))
 			defer server.Close()
 
-			notifyConfig := tt.configure(server.URL)
-			Notify(notifyConfig, Message{
+			Send(tt.configure(server.URL), Message{
 				Routes:  []string{tt.route},
 				Content: "test notification",
 				FeedItem: gofeed.Item{

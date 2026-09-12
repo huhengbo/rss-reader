@@ -1,8 +1,8 @@
-package utils
+package feed
 
 import "testing"
 
-func TestMatchStr(t *testing.T) {
+func TestMatchTitle(t *testing.T) {
 	tests := []struct {
 		name     string
 		patterns []string
@@ -38,12 +38,11 @@ func TestMatchStr(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hits := 0
-			MatchStr(tt.input, tt.patterns, func(string) {
+			MatchTitle(tt.input, tt.patterns, func(string) {
 				hits++
 			})
-
 			if hits != tt.wantHits {
-				t.Fatalf("MatchStr() callback count = %d, want %d", hits, tt.wantHits)
+				t.Fatalf("MatchTitle() callback count = %d, want %d", hits, tt.wantHits)
 			}
 		})
 	}
