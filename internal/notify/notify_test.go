@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -58,13 +59,11 @@ func TestSendRoutesToConfiguredProviders(t *testing.T) {
 				if r.URL.Path != tt.expectedPath {
 					t.Errorf("request path = %q, want %q", r.URL.Path, tt.expectedPath)
 				}
-				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(`{"ok":true}`))
 			}))
 			defer server.Close()
 
-			Send(tt.configure(server.URL), Message{
+			Send(context.Background(), tt.configure(server.URL), Message{
 				Routes:  []string{tt.route},
 				Content: "test notification",
 				FeedItem: gofeed.Item{
@@ -77,5 +76,35 @@ func TestSendRoutesToConfiguredProviders(t *testing.T) {
 				t.Fatalf("provider received %d requests, want 1", requests)
 			}
 		})
+	}
+}
+
+func TestRequestPostRetriesRetryableStatus(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if requests == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	if err := requestPost(context.Background(), server.Client(), server.URL, []byte(`{"ok":true}`)); err != nil {
+		t.Fatalf("requestPost() error = %v", err)
+	}
+	if requests != 2 {
+		t.Fatalf("requests = %d, want 2", requests)
+	}
+}
+
+func TestRequestPostHonorsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := requestPost(ctx, defaultHTTPClient, "https://example.invalid", []byte(`{}`))
+	if err == nil {
+		t.Fatal("requestPost() error = nil, want context cancellation")
 	}
 }
