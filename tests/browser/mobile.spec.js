@@ -69,9 +69,12 @@ test('phone landscape keeps mobile navigation and preserves reading state across
   await page.locator('#skin').selectOption('paper');
   await page.locator('#density').selectOption('compact');
 
-  const toggle = page.getByRole('button', { name: '折叠 技术周刊', exact: true });
+  const card = page.locator('#sources > article').filter({ has: page.getByRole('heading', { name: '技术周刊', exact: true }) });
+  const toggle = card.locator('button[data-action="collapse"]');
+  await expect(toggle).toHaveAccessibleName('折叠 技术周刊');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toHaveAccessibleName('展开 技术周刊');
 
   await page.setViewportSize({ width: 844, height: 390 });
   await expectNoHorizontalOverflow(page);
@@ -80,10 +83,12 @@ test('phone landscape keeps mobile navigation and preserves reading state across
   await expect(page.locator('html')).toHaveAttribute('data-skin', 'paper');
   await expect(page.locator('html')).toHaveAttribute('data-density', 'compact');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toHaveAccessibleName('展开 技术周刊');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('searchbox')).toHaveValue('技术');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toHaveAccessibleName('展开 技术周刊');
 });
 
 test('search remains usable when the visual area becomes keyboard-sized', async ({ page }) => {
