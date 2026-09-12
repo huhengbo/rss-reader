@@ -1,35 +1,28 @@
 package utils
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/mmcdole/gofeed"
 
-	"rss-reader/globals"
+	"rss-reader/internal/archive"
+	appstate "rss-reader/internal/state"
 	"rss-reader/models"
 )
 
 func TestGetFeedsPreservesConfiguredOrderAndSkipsMissing(t *testing.T) {
-	originalConfig := globals.RssUrls
-	originalDB := globals.DbMap
-	defer func() {
-		globals.RssUrls = originalConfig
-		globals.DbMap = originalDB
-	}()
-
-	globals.RssUrls = models.Config{
+	state := appstate.New(models.Config{
 		Values: []string{
 			"https://example.com/first.xml",
 			"https://example.com/missing.xml",
 			"https://example.com/second.xml",
 		},
-	}
-	globals.DbMap = map[string]models.Feed{
-		"https://example.com/first.xml":  {Title: "First"},
-		"https://example.com/second.xml": {Title: "Second"},
-	}
+	})
+	state.SetFeed("https://example.com/first.xml", models.Feed{Title: "First"})
+	state.SetFeed("https://example.com/second.xml", models.Feed{Title: "Second"})
 
-	feeds := GetFeeds()
+	feeds := GetFeeds(state)
 	if len(feeds) != 2 {
 		t.Fatalf("GetFeeds() returned %d feeds, want 2", len(feeds))
 	}
@@ -76,24 +69,14 @@ func TestNormalizeLink(t *testing.T) {
 }
 
 func TestCheckHandlesEmptyFeedState(t *testing.T) {
-	originalConfig := globals.RssUrls
-	originalDB := globals.DbMap
-	originalHash := globals.Hash
-	originalMatchList := globals.MatchList
-	defer func() {
-		globals.RssUrls = originalConfig
-		globals.DbMap = originalDB
-		globals.Hash = originalHash
-		globals.MatchList = originalMatchList
-	}()
-
 	const feedURL = "https://example.com/feed.xml"
-	globals.RssUrls = models.Config{}
-	globals.DbMap = map[string]models.Feed{
-		feedURL: {Title: "Cached feed", Items: nil},
+	state := appstate.New(models.Config{Keywords: []string{"never-match-this-title"}})
+	state.SetFeed(feedURL, models.Feed{Title: "Cached feed", Items: nil})
+
+	archiveStore, err := archive.Open(filepath.Join(t.TempDir(), "archives.txt"))
+	if err != nil {
+		t.Fatalf("archive.Open() error = %v", err)
 	}
-	globals.Hash = map[string]int{}
-	globals.MatchList = []string{"never-match-this-title"}
 
 	item := &gofeed.Item{
 		Title: "Example item",
@@ -101,8 +84,8 @@ func TestCheckHandlesEmptyFeedState(t *testing.T) {
 	}
 	result := &gofeed.Feed{Items: []*gofeed.Item{item}}
 
-	Check(feedURL, result, item)
-	Check(feedURL, &gofeed.Feed{}, item)
-	Check(feedURL, nil, item)
-	Check(feedURL, result, nil)
+	Check(state, archiveStore, feedURL, result, item)
+	Check(state, archiveStore, feedURL, &gofeed.Feed{}, item)
+	Check(state, archiveStore, feedURL, nil, item)
+	Check(state, archiveStore, feedURL, result, nil)
 }
