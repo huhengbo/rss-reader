@@ -3,9 +3,15 @@ config.json
 archives.txt
 *.local.json
 
-# Build output
+# Build and test output
 /bin/
 /dist/
+/rss-reader
+/rss-reader.exe
+/node_modules/
+/playwright-report/
+/test-results/
+/artifacts/
 
 # Editors and OS files
 .DS_Store

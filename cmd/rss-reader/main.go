@@ -42,6 +42,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("create HTTP server: %w", err)
 	}
+	defer appServer.Close()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -78,6 +79,7 @@ func run() error {
 	case <-ctx.Done():
 	}
 
+	appServer.Close()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
