@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const mobileTest = '**/mobile-device.spec.js';
+
 export default defineConfig({
   testDir: './tests/browser',
   fullyParallel: false,
@@ -16,9 +18,11 @@ export default defineConfig({
     timezoneId: 'Asia/Shanghai'
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'chromium', testIgnore: mobileTest, use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', testIgnore: mobileTest, use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', testIgnore: mobileTest, use: { ...devices['Desktop Safari'] } },
+    { name: 'mobile-chromium', testMatch: mobileTest, use: { ...devices['Pixel 5'] } },
+    { name: 'mobile-webkit', testMatch: mobileTest, use: { ...devices['iPhone 13'] } },
     // Native tab zoom requires a separate persistent Chromium context.
     { name: 'chromium-zoom', testDir: './tests/zoom', use: { browserName: 'chromium' } }
   ],
