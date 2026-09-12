@@ -28,7 +28,7 @@ const (
 	contentType   = "application/json"
 	tokenReplace  = "${token}"
 
-	maxAttempts        = 3
+	maxAttempts         = 3
 	notificationTimeout = 10 * time.Second
 )
 
