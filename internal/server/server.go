@@ -185,7 +185,19 @@ func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	closeNormally := func() {
-		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "snapshot complete"), time.Now().Add(websocketWriteTimeout))
+		if err := conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "snapshot complete"), time.Now().Add(websocketWriteTimeout)); err != nil {
+			return
+		}
+		// Let the peer acknowledge Close before tearing down TCP. An immediate
+		// Close can race Firefox's opening handshake and discard the snapshot.
+		timer := time.NewTimer(2 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-done:
+		case <-s.done:
+		case <-r.Context().Done():
+		case <-timer.C:
+		}
 	}
 	if s.state.Config().AutoUpdatePush == 0 {
 		closeNormally()
