@@ -2,14 +2,15 @@ package utils
 
 import (
 	"fmt"
-	"github.com/mmcdole/gofeed"
 	"log"
-	"rss-reader/globals"
-	"rss-reader/models"
 	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mmcdole/gofeed"
+
+	"rss-reader/globals"
+	"rss-reader/models"
 )
 
 func UpdateFeeds() {
@@ -32,8 +33,13 @@ func UpdateFeed(url, formattedTime string) {
 		log.Printf("Error fetching feed: %v | %v", url, err)
 		return
 	}
-	//feed内容无更新时无需更新缓存
-	if cache, ok := globals.DbMap[url]; ok &&
+
+	globals.Lock.RLock()
+	cache, ok := globals.DbMap[url]
+	globals.Lock.RUnlock()
+
+	// feed内容无更新时无需更新缓存
+	if ok &&
 		len(result.Items) > 0 &&
 		len(cache.Items) > 0 &&
 		result.Items[0].Link == cache.Items[0].Link {
@@ -122,39 +128,54 @@ func WatchConfigFileChanges(filePath string) {
 }
 
 func Check(url string, result *gofeed.Feed, v *gofeed.Item) {
-	cache, cacheOk := globals.DbMap[url]
-	if !cacheOk || cache.Items[0].Link != result.Items[0].Link {
+	if result == nil || v == nil || len(result.Items) == 0 {
+		return
+	}
 
-		link := v.Link
-		link = strings.TrimSpace(link)
-		linkStrSplitForParam := strings.Split(link, "?")
-		if linkStrSplitForParam != nil && len(linkStrSplitForParam) != 0 {
-			link = linkStrSplitForParam[0]
-		}
-		linkStrSplitForRoute := strings.Split(link, "#")
-		if linkStrSplitForRoute != nil && len(linkStrSplitForRoute) != 0 {
-			link = linkStrSplitForRoute[0]
-		}
+	globals.Lock.RLock()
+	cache, cacheOK := globals.DbMap[url]
+	globals.Lock.RUnlock()
 
-		_, fileCacheOk := globals.Hash[link]
-		if fileCacheOk {
+	if cacheOK && len(cache.Items) > 0 && cache.Items[0].Link == result.Items[0].Link {
+		return
+	}
+
+	link := normalizeLink(v.Link)
+
+	globals.Lock.RLock()
+	_, fileCacheOK := globals.Hash[link]
+	globals.Lock.RUnlock()
+	if fileCacheOK {
+		return
+	}
+
+	// 匹配关键词
+	MatchStr(v.Title, func(msg string) {
+		globals.Lock.Lock()
+		if _, exists := globals.Hash[link]; exists {
+			globals.Lock.Unlock()
 			return
 		}
-		// 匹配关键词
-		MatchStr(v.Title, func(msg string) {
-			_, fileCacheOk = globals.Hash[link]
-			if fileCacheOk {
-				return
-			} else {
-				globals.Hash[link] = 1
-				// 发送通知
-				go Notify(Message{
-					Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
-					Content:  fmt.Sprintf("%s\n%s", msg, v.Link),
-					FeedItem: *v,
-				})
-				globals.WriteFile(globals.RssUrls.Archives, link)
-			}
+		globals.Hash[link] = 1
+		globals.Lock.Unlock()
+
+		// 发送通知
+		go Notify(Message{
+			Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
+			Content:  fmt.Sprintf("%s\n%s", msg, v.Link),
+			FeedItem: *v,
 		})
+		globals.WriteFile(globals.RssUrls.Archives, link)
+	})
+}
+
+func normalizeLink(link string) string {
+	link = strings.TrimSpace(link)
+	if index := strings.IndexByte(link, '?'); index >= 0 {
+		link = link[:index]
 	}
+	if index := strings.IndexByte(link, '#'); index >= 0 {
+		link = link[:index]
+	}
+	return link
 }
