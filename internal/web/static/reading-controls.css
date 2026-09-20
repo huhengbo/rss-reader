@@ -1,0 +1,31 @@
+/* Native disclosure: one DOM and one keyboard order at every screen size. */
+.hydrated .display-settings.enhanced-only:not([hidden]) { display: block !important; }
+.display-settings { margin: 18px 0; }
+.display-settings > summary { display: none; }
+.display-settings .appearance { margin-bottom: 0; }
+.display-settings .filter-label { flex: 1 1 180px; }
+button[aria-disabled="true"] { cursor: wait; }
+
+@media (max-width: 760px), (max-width: 900px) and (max-height: 500px) {
+  .display-settings > summary {
+    display: list-item;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--control);
+    border-radius: var(--small-radius);
+    color: var(--text);
+    background: var(--surface);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .display-settings[open] > summary { margin-bottom: 12px; }
+  .display-settings .filter-label { max-width: none; grid-column: 1 / -1; }
+  .hydrated .toolbar.enhanced-only #refresh-view { grid-column: 1 / -1; }
+  .toolbar input, .display-settings select { font-size: 16px; }
+  /* main already accounts for the Home Indicator inset. Do not count it twice. */
+  .page-footer { padding-bottom: 0; }
+}
+
+@media (forced-colors: active) {
+  .display-settings > summary { border-color: CanvasText; }
+}

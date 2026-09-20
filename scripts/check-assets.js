@@ -3,7 +3,7 @@ import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 
 const root = 'internal/web/static';
-const allowed = new Set(['app.js', 'connection.js', 'model.js', 'preferences.js', 'app.css', 'themes.css']);
+const allowed = new Set(['app.js', 'connection.js', 'model.js', 'preferences.js', 'reading-controls.js', 'app.css', 'themes.css', 'reading-controls.css']);
 const files = readdirSync(root).filter(name => /\.(js|css)$/.test(name));
 const unexpected = files.filter(name => !allowed.has(name));
 if (unexpected.length) throw new Error(`Untracked runtime dependencies: ${unexpected.join(', ')}`);

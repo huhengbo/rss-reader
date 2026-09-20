@@ -9,6 +9,7 @@
   <script src="/static/preferences.js"></script>
   <link rel="stylesheet" href="/static/themes.css">
   <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/reading-controls.css">
   <script type="module" src="/static/app.js"></script>
 </head>
 <body>
@@ -27,21 +28,24 @@
         <div><p class="eyebrow">YOUR DAILY READING</p><h1 id="page-title"><<.Snapshot.Title>></h1><p class="page-description" id="page-description"><<.Snapshot.Description>></p></div>
         <div class="stats"><strong id="source-count"><<len .Snapshot.Sources>></strong><span>订阅源</span></div>
       </header>
-      <section class="appearance enhanced-only" aria-label="阅读外观">
-        <label>皮肤<select id="skin"><option value="slate">Slate · 简洁工作台</option><option value="paper">Paper · 纸感阅读</option><option value="grove">Grove · 柔和自然</option><option value="terminal">Terminal · 终端风格</option></select></label>
-        <label>明暗<select id="mode"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
-        <label>密度<select id="density"><option value="comfortable">舒适</option><option value="compact">紧凑</option></select></label>
-      </section>
       <div class="toolbar enhanced-only" role="search" aria-label="筛选订阅内容">
-        <label class="search-wrap"><span class="sr-only">搜索文章或订阅源</span><input id="search" type="search" placeholder="搜索文章或订阅源" autocomplete="off" maxlength="500"></label>
+        <label class="search-wrap"><span class="sr-only">搜索文章或订阅源</span><input id="search" type="search" placeholder="搜索文章或订阅源" autocomplete="off" maxlength="500" enterkeyhint="search"></label>
         <button id="clear-search" type="button">清空</button>
-        <label class="filter-label"><span class="sr-only">筛选订阅源</span><select id="source-filter"><option value="">全部订阅源</option></select></label>
         <button id="refresh-view" type="button" title="读取服务器的最新缓存，不触发外部 RSS 抓取">刷新视图</button>
       </div>
       <div class="status-row enhanced-only">
         <p id="connection" role="status" aria-live="polite">正在连接…</p>
         <p id="result-count" role="status" aria-live="polite"></p>
       </div>
+      <details id="display-settings" class="display-settings enhanced-only" open>
+        <summary>显示与筛选</summary>
+        <section class="appearance enhanced-only" aria-label="阅读外观与筛选">
+          <label>皮肤<select id="skin"><option value="slate">Slate · 简洁工作台</option><option value="paper">Paper · 纸感阅读</option><option value="grove">Grove · 柔和自然</option><option value="terminal">Terminal · 终端风格</option></select></label>
+          <label>明暗<select id="mode"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+          <label>密度<select id="density"><option value="comfortable">舒适</option><option value="compact">紧凑</option></select></label>
+          <label class="filter-label">筛选订阅源<select id="source-filter"><option value="">全部订阅源</option></select></label>
+        </section>
+      </details>
       <div id="updates" class="notice enhanced-only" hidden><p id="update-text" role="status" aria-live="polite"></p><button id="apply-updates" type="button">应用更新</button></div>
       <p id="page-error" class="notice warning" role="status" hidden></p>
       <section aria-label="订阅内容">
@@ -67,8 +71,8 @@
   <div class="card-body" id="body-<<.ID>>">
     <p class="source-message" <<if not .Message>>hidden<<end>>><<.Message>></p>
     <div class="skeleton" <<if ne .Status "loading">>hidden<<end>> aria-hidden="true"><i></i><i></i><i></i></div>
-    <ul class="article-list" role="list"><<range .Items>><<template "item" .>><<end>></ul>
-    <button class="more enhanced-only" data-action="more" type="button" <<if le (len .Items) 8>>hidden<<end>>>展开更多</button>
+    <ul class="article-list" role="list" id="list-<<.ID>>"><<range .Items>><<template "item" .>><<end>></ul>
+    <button class="more enhanced-only" data-action="more" type="button" aria-controls="list-<<.ID>>" <<if le (len .Items) 8>>hidden<<end>>>展开更多</button>
     <p class="empty-source" <<if .Items>>hidden<<end>>>当前没有可展示的文章</p>
     <div class="card-footer"><span>最近成功同步 <time data-part="success" datetime="<<.LastSuccessAt>>"><<if .LastSuccessAt>><<.LastSuccessAt>><<else>>尚未成功<<end>></time></span><span>内容变更 <time data-part="changed" datetime="<<.ContentChangedAt>>"><<if .ContentChangedAt>><<.ContentChangedAt>><<else>>—<<end>></time></span></div>
   </div>

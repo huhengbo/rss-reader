@@ -50,11 +50,17 @@ for (const viewport of portraitViewports) {
     await expect(page.locator('.sidebar nav')).toBeHidden();
     await expect(page.getByRole('searchbox')).toBeVisible();
     await expect(page.locator('.article-list').first()).toHaveCSS('overflow-y', 'visible');
+    await expect(page.locator('#display-settings')).not.toHaveAttribute('open');
+    await expect(page.locator('#skin')).toBeHidden();
+    await expect(page.getByRole('searchbox')).toHaveCSS('font-size', '16px');
+    await page.locator('#display-settings > summary').click();
+    await expect(page.locator('#skin')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
 
     const viewportMeta = await page.locator('meta[name="viewport"]').getAttribute('content');
     expect(viewportMeta).toContain('viewport-fit=cover');
 
-    const undersizedTargets = await page.locator('button:visible, input:visible, select:visible').evaluateAll(elements =>
+    const undersizedTargets = await page.locator('button:visible, input:visible, select:visible, summary:visible').evaluateAll(elements =>
       elements
         .map(element => ({ label: element.getAttribute('aria-label') || element.id || element.textContent?.trim(), height: element.getBoundingClientRect().height }))
         .filter(target => target.height < 43.5)
@@ -66,6 +72,7 @@ for (const viewport of portraitViewports) {
 test('phone landscape keeps mobile navigation and preserves reading state across rotation', async ({ page }) => {
   await openReader(page, { width: 390, height: 844 });
   await page.getByRole('searchbox').fill('技术');
+  await page.locator('#display-settings > summary').click();
   await page.locator('#skin').selectOption('paper');
   await page.locator('#density').selectOption('compact');
 
@@ -82,6 +89,7 @@ test('phone landscape keeps mobile navigation and preserves reading state across
   await expect(page.getByRole('searchbox')).toHaveValue('技术');
   await expect(page.locator('html')).toHaveAttribute('data-skin', 'paper');
   await expect(page.locator('html')).toHaveAttribute('data-density', 'compact');
+  await expect(page.locator('#display-settings')).toHaveAttribute('open');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle).toHaveAccessibleName('展开 技术周刊');
 
