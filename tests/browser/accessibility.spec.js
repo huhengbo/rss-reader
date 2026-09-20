@@ -11,7 +11,7 @@ test('named native controls retain keyboard order and recover focus after source
   await expect(page.getByRole('link', { name: '跳到订阅内容' })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('main')).toBeFocused();
-  for (const id of ['skin', 'mode', 'density', 'search', 'clear-search', 'source-filter', 'refresh-view']) {
+  for (const id of ['search', 'clear-search', 'refresh-view', 'skin', 'mode', 'density', 'source-filter']) {
     await page.keyboard.press('Tab');
     const control = page.locator(`#${id}`);
     await expect(control).toBeFocused();
@@ -21,7 +21,9 @@ test('named native controls retain keyboard order and recover focus after source
   await expect(card.getByRole('heading', { level: 2 })).toBeVisible();
   const list = card.getByRole('list');
   await expect(list.getByRole('listitem')).toHaveCount(8);
-  await expect(card.locator('[data-action="more"]')).toHaveAttribute('aria-expanded', 'false');
+  const more = card.locator('[data-action="more"]');
+  await expect(more).toHaveAttribute('aria-expanded', 'false');
+  await expect(more).toHaveAttribute('aria-controls', await list.getAttribute('id'));
   const toggle = card.getByRole('button', { name: '折叠 技术周刊', exact: true });
   const controlled = await toggle.getAttribute('aria-controls');
   await expect(page.locator(`[id="${controlled}"]`)).toBeVisible();
@@ -31,5 +33,5 @@ test('named native controls retain keyboard order and recover focus after source
   await expect(card).toHaveCount(0);
   await expect(page.getByRole('main')).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.locator('#skin')).toBeFocused();
+  await expect(page.locator('#search')).toBeFocused();
 });

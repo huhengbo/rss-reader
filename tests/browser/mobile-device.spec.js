@@ -42,11 +42,8 @@ test('mobile profile uses touch input without hover-only interaction', async ({ 
     mobileUA: /Android|iPhone|Mobile/i.test(navigator.userAgent)
   }));
 
-  // Playwright config must explicitly emulate touch for both mobile projects.
-  // Linux WebKit currently accepts tap() with the iPhone profile but still exposes
-  // navigator.maxTouchPoints as 0, so browser-level touch-point/coarse assertions
-  // are kept strict on Chromium while WebKit is covered by configured hasTouch,
-  // mobile UA, no fine-hover and the real tap() interaction test below.
+  // Linux WebKit accepts tap() but may still expose maxTouchPoints as 0.
+  // Keep Android assertions strict; do not fake properties to make WebKit green.
   expect(testInfo.project.use.hasTouch).toBe(true);
   expect(capabilities.fineHover).toBe(false);
   expect(capabilities.mobileUA).toBe(true);
@@ -59,8 +56,12 @@ test('mobile profile uses touch input without hover-only interaction', async ({ 
   await expect(page.locator('.sidebar nav')).toBeHidden();
   await expect(page.locator('.article-list').first()).toHaveCSS('overflow-y', 'visible');
   await expect(page.getByRole('button', { name: '清空', exact: true })).toHaveCSS('touch-action', 'manipulation');
+  await expect(page.locator('#display-settings')).not.toHaveAttribute('open');
+  await page.locator('#display-settings > summary').tap();
+  await expect(page.locator('#source-filter')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 
-  const undersizedTargets = await page.locator('button:visible, input:visible, select:visible').evaluateAll(elements =>
+  const undersizedTargets = await page.locator('button:visible, input:visible, select:visible, summary:visible').evaluateAll(elements =>
     elements
       .map(element => ({ label: element.getAttribute('aria-label') || element.id || element.textContent?.trim(), height: element.getBoundingClientRect().height }))
       .filter(target => target.height < 43.5)
@@ -69,10 +70,19 @@ test('mobile profile uses touch input without hover-only interaction', async ({ 
 });
 
 test('touch interactions and rotation-sized resize preserve state', async ({ page }) => {
+  let sockets = 0;
+  page.on('websocket', () => sockets++);
   await openReader(page);
+  await expect(page.locator('#connection')).toHaveAttribute('data-state', 'connected');
+  const initialSockets = sockets;
   const search = page.getByRole('searchbox');
   await search.fill('技术');
+  await page.locator('#display-settings > summary').tap();
   await page.locator('#skin').selectOption('grove');
+  await page.locator('#density').selectOption('compact');
+  await page.locator('#source-filter').selectOption({ label: '技术周刊' });
+  await page.locator('#display-settings > summary').tap();
+  await expect(page.locator('#skin')).toBeHidden();
 
   const card = page.locator('#sources > article').filter({ has: page.getByRole('heading', { name: '技术周刊', exact: true }) });
   const toggle = card.locator('button[data-action="collapse"]');
@@ -87,10 +97,16 @@ test('touch interactions and rotation-sized resize preserve state', async ({ pag
   await expect(page.locator('.sidebar nav')).toBeHidden();
   await expect(search).toHaveValue('技术');
   await expect(page.locator('html')).toHaveAttribute('data-skin', 'grove');
+  await expect(page.locator('html')).toHaveAttribute('data-density', 'compact');
+  await expect(page.locator('#display-settings')).not.toHaveAttribute('open');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
   await page.setViewportSize(viewport);
+  await page.locator('#display-settings > summary').tap();
+  await expect(page.locator('#source-filter option:checked')).toHaveText('技术周刊');
+  await page.locator('#display-settings > summary').tap();
   await page.getByRole('button', { name: '清空', exact: true }).tap();
   await expect(search).toHaveValue('');
   await expect(search).toBeFocused();
+  expect(sockets).toBe(initialSockets);
 });

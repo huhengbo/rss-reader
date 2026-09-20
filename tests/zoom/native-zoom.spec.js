@@ -91,11 +91,14 @@ test('native 100–200% browser zoom preserves reading and controls across all s
           expect(await page.locator('.article-title').evaluateAll(elements => elements.filter(el => el.getClientRects().length).every(el => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1))).toBe(true);
         }
 
-        // Exercise the actual controls at 200%, not just screenshot dimensions.
-        await page.locator('#skin').focus();
-        for (const id of ['mode', 'density', 'search', 'clear-search', 'source-filter', 'refresh-view']) {
+        // Native zoom enters the mobile breakpoint. Open the real disclosure
+        // before traversing it; no hidden controls or forced actions.
+        const settings = page.locator('#display-settings');
+        if (!await settings.evaluate(element => element.open)) await settings.locator('summary').click();
+        await page.locator('#search').focus();
+        for (const selector of ['#clear-search', '#refresh-view', '#display-settings > summary', '#skin', '#mode', '#density', '#source-filter']) {
           await page.keyboard.press('Tab');
-          await expect(page.locator(`#${id}`)).toBeFocused();
+          await expect(page.locator(selector)).toBeFocused();
         }
         await page.getByRole('searchbox').fill('没有这篇文章');
         await expect(page.getByRole('heading', { name: '没有匹配的内容' })).toBeVisible();

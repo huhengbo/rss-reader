@@ -1,5 +1,6 @@
 import { parseSnapshot, contentKey, newItemCount } from './model.js';
 import { ReaderConnection } from './connection.js';
+import { restoreReadingFocus, initializeDisplaySettings } from './reading-controls.js';
 
 const $ = selector => document.querySelector(selector);
 const text = (element, value) => { if (element.textContent !== value) element.textContent = value; };
@@ -61,6 +62,7 @@ function boot() {
 
   function render() {
     const active = document.activeElement;
+    const focusFallback = active?.closest('.feed-card')?.querySelector('[data-action="collapse"]');
     const anchor = [...grid.children].find(card => !card.hidden && card.getBoundingClientRect().bottom > 0);
     const anchorTop = anchor?.getBoundingClientRect().top;
     const wantedIds = new Set(shown.sources.map(source => source.id));
@@ -110,6 +112,7 @@ function boot() {
       card.classList.toggle('expanded', showAll);
       const matchIDs = new Set((showAll ? matches : matches.slice(0, 8)).map(item => item.id));
       const list = card.querySelector('.article-list');
+      list.id = `list-${source.id}`;
       const oldItems = new Map([...list.children].map(li => [li.dataset.itemId, li]));
       const items = [];
       for (const item of source.items) {
@@ -126,6 +129,7 @@ function boot() {
       const more = card.querySelector('[data-action="more"]'); more.hidden = matches.length <= 8 || Boolean(search);
       text(more, showAll ? '收起列表' : `展开更多（共 ${matches.length} 篇）`);
       more.setAttribute('aria-expanded', String(showAll));
+      more.setAttribute('aria-controls', list.id);
       const empty = card.querySelector('.empty-source'); empty.hidden = source.items.length > 0;
       text(empty, source.status === 'loading' ? '首次同步中，内容就绪后会显示在这里。' : source.status === 'error' ? '暂时无法取得内容，请检查订阅源配置。' : '这个订阅源暂时没有文章。');
       updateTime(card.querySelector('[data-part="success"]'), source.lastSuccessAt, '尚未成功');
@@ -139,7 +143,7 @@ function boot() {
     text($('#empty-title'), shown.sources.length ? '没有匹配的内容' : '还没有订阅源');
     text($('#empty-description'), shown.sources.length ? '换个关键词，或清空搜索并选择全部订阅源。' : '请在配置文件的 values 中添加订阅源。');
     if (anchor?.isConnected && !anchor.hidden && window.scrollY > 0) window.scrollBy(0, anchor.getBoundingClientRect().top - anchorTop);
-    if (active && !active.isConnected) $('#main').focus({ preventScroll: true });
+    restoreReadingFocus(active, focusFallback);
   }
 
   function receive(snapshot) {
@@ -177,8 +181,11 @@ function boot() {
   });
   $('#apply-updates').addEventListener('click', () => { if (!pending) return; shown = pending; pending = null; $('#updates').hidden = true; render(); $('#refresh-view').focus({ preventScroll: true }); });
   $('#refresh-view').addEventListener('click', async () => {
-    const button = $('#refresh-view'); button.disabled = true;
-    try { await connection.refresh(); } finally { button.disabled = false; }
+    const button = $('#refresh-view');
+    if (button.getAttribute('aria-disabled') === 'true') return;
+    // Native disabled buttons can discard keyboard focus while the request runs.
+    button.setAttribute('aria-disabled', 'true'); button.setAttribute('aria-busy', 'true');
+    try { await connection.refresh(); } finally { button.removeAttribute('aria-disabled'); button.removeAttribute('aria-busy'); }
   });
   let clock;
   const start = () => {
@@ -187,6 +194,7 @@ function boot() {
   };
   window.addEventListener('pagehide', () => { connection.stop(); clearInterval(clock); media.removeEventListener('change', followSystem); });
   window.addEventListener('pageshow', event => { if (event.persisted) { media.addEventListener('change', followSystem); followSystem(); start(); connection.refresh(); } });
+  initializeDisplaySettings();
   render(); document.documentElement.classList.add('hydrated'); start();
 }
 

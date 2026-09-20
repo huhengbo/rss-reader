@@ -73,6 +73,7 @@ test('native offline/online recovery preserves document, search and appearance o
   await openReader(page);
   await expect(page.locator('#connection')).toHaveAttribute('data-state', 'connected');
   await page.getByRole('searchbox').fill('技术');
+  await page.locator('#display-settings > summary').click();
   await page.locator('#skin').selectOption('paper');
   await context.setOffline(true);
   await expect(page.locator('#connection')).toHaveAttribute('data-state', 'offline');
@@ -92,8 +93,8 @@ test('appearance is persistent, follows system only when selected and does not r
   await page.locator('#density').selectOption('compact');
   await page.locator('#mode').selectOption('dark');
   await page.emulateMedia({ colorScheme: 'light' });
-  await expect(page.locator('html')).toHaveAttribute('data-color', 'dark');
   expect(sockets).toBe(before);
+  await expect(page.locator('html')).toHaveAttribute('data-color', 'dark');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-skin', 'grove');
   await expect(page.locator('html')).toHaveAttribute('data-density', 'compact');
